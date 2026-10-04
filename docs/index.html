@@ -117,6 +117,12 @@
   @media (max-width: 420px) { figure { flex-basis: 100%; max-width: 18rem; } }
   @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
 .tag-free,.tag-paid{display:inline-block;font-size:.75rem;font-weight:600;padding:.1rem .5rem;border-radius:999px;vertical-align:middle;margin-left:.4rem}.tag-free{background:#1f6f43;color:#fff}.tag-paid{background:#8a5a00;color:#fff}
+
+  img[data-zoom] { cursor: zoom-in; }
+  #lightbox { position: fixed; inset: 0; z-index: 99; display: none; align-items: center; justify-content: center; padding: 1rem; background: rgba(0,0,0,.88); cursor: zoom-out; }
+  #lightbox.on { display: flex; }
+  #lightbox img { max-width: 100%; max-height: 100%; border-radius: 8px; background: #111; }
+  #lightbox .cap { position: absolute; left: 0; right: 0; bottom: .6rem; text-align: center; color: #ddd; font-size: .85rem; padding: 0 1rem; }
 </style>
 </head>
 <body>
@@ -615,7 +621,7 @@ Also
   <h3 lang="ko">3. 저장 공간이 가득 찼어요</h3>
   <div class="shots">
     <figure><img src="images/saves-export-ko.png" alt="저장 탭: 이어하기, 이름 변경, 이야기 내보내기, 저장 파일, 삭제" loading="lazy"><figcaption lang="ko"><b>저장 탭</b>: <b>저장 파일</b>(백업), <b>이야기 내보내기</b>, <b>삭제</b>.</figcaption></figure>
-    <figure><img src="images/quota-full-ko.png" alt="저장 공간이 가득 찼어요 안내" loading="lazy"><figcaption lang="ko">문서 5,000개가 한도. 가득 차면 저장이 안 된다.</figcaption></figure>
+    <figure><img src="images/quota-full-ko.png" alt="저장 공간이 가득 찼어요 안내" loading="lazy"><figcaption lang="ko">저장 용량이 가득 차면 새 내용이 저장되지 않는다. 오래된 저장을 파일로 내보낸 뒤 삭제하면 다시 늘어난다.</figcaption></figure>
   </div>
   <ul lang="ko">
     <li>저장 탭에서 오래된 저장이나 분기를 <b>이야기 내보내기</b>로 파일에 남긴 뒤 삭제하면 공간이 생긴다.</li>
@@ -636,7 +642,7 @@ Also
     <p><a href="https://github.com/wonjoonSeol-WS/dice-roguelife/issues">github.com/wonjoonSeol-WS/dice-roguelife/issues</a>에 남겨 주세요. 이렇게 적어 주면 빨라요.</p>
     <ul>
       <li><b>버전</b>: ⚙ 설정 맨 위의 "버전 v숫자" (지금 v2.4.0)</li>
-      <li><b>재현 순서</b>: 무엇을 눌렀고 무엇을 입력했는지</li>
+      <li><b>재현 순서</b>: 똑같이 따라 하면 다시 나오는 순서를 적어 주세요. <b>또는 저장 파일을 첨부</b>해 주세요 (저장 탭 → <b>저장 파일</b> 버튼으로 내려받기)</li>
       <li><b>스크린샷</b>: 캡처 모드를 켜면 이름이 가려진다</li>
     </ul>
   </div>
@@ -651,6 +657,7 @@ Also
 </footer>
 
 </main>
+<div id="lightbox" role="dialog" aria-label="이미지 크게 보기"><img alt=""><div class="cap"></div></div>
 <script>
 (function () {
   var btn = document.getElementById('copyPrompt');
@@ -664,6 +671,14 @@ Also
       try { document.execCommand('copy'); done(); } catch (e) {}
     }
   });
+
+  var lb = document.getElementById('lightbox'), lbImg = lb.querySelector('img'), lbCap = lb.querySelector('.cap');
+  Array.prototype.forEach.call(document.querySelectorAll('main img'), function (im) {
+    im.setAttribute('data-zoom', '');
+    im.addEventListener('click', function () { lbImg.src = im.currentSrc || im.src; lbImg.alt = im.alt; lbCap.textContent = im.alt; lb.classList.add('on'); });
+  });
+  lb.addEventListener('click', function () { lb.classList.remove('on'); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') lb.classList.remove('on'); });
   /* ENGLISH LATER: restore the reference's language toggle here (apply(lang) sets data-lang and lang on <html>, remembers it in localStorage). */
 })();
 </script>
