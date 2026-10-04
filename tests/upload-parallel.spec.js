@@ -263,3 +263,139 @@ test('중복 정리 finds a recompressed copy but not a picture with only a smal
   expect(await pg.evaluate(() => DR.app.images.length), 'cancel keeps everything').toBe(4);
   expect(errs).toEqual([]);
 });
+
+// editing tags or picking a cover while pictures are still being sent must not stop the upload
+test('editing during an upload does not stop it', async ({ game }) => {
+  const { pg, errs } = await setup(game);
+  // a set with three frames first, so there is a cover to pick
+  await pg.evaluate(`(${NAMES})(['zed_smile.png','zed_joy.png','zed_anger.png'])`);
+  await pg.waitForFunction('DR.app.images.length===3', null, { timeout: 30000 });
+  await pg.waitForFunction("document.querySelector('#uplStat').textContent===''", null, { timeout: 30000 });
+  await pg.evaluate(`(${MAKE})(45,'e')`);
+  await pg.waitForFunction('DR.app.images.length>=12', null, { timeout: 30000 });
+  const statBefore = await pg.evaluate(() => document.querySelector('#uplStat').textContent);
+  // pick a cover (re-renders the tab) and edit a tag in the middle of the upload
+  await pg.click('[data-cover]');
+  await pg.waitForTimeout(300);
+  const statAfterCover = await pg.evaluate(() => document.querySelector('#uplStat').textContent);
+  const tag = pg.locator('.img [data-f="tags"]').first();
+  await tag.fill('night, rain');
+  await tag.dispatchEvent('change');
+  await pg.waitForTimeout(300);
+  await pg.waitForFunction('DR.app.images.length===48', null, { timeout: 60000 });
+  // the progress text is a new empty element after the re-render: wait for the list itself to be complete
+  await expect.poll(async () => (await indexed(pg)).length, { timeout: 30000 }).toBe(48);
+  const ids = await indexed(pg);
+  console.log(
+    'status shown before:',
+    JSON.stringify(statBefore),
+    '| after the cover pick:',
+    JSON.stringify(statAfterCover),
+  );
+  expect(ids.length, 'every picture is in the saved list').toBe(48);
+  expect(statAfterCover, 'the progress text is still shown after the tab re-rendered').not.toBe('');
+  expect(errs).toEqual([]);
+});
+
+// a second upload started while one is running is refused (it would send the same pictures twice)
+test('a second upload while one is running is refused', async ({ game }) => {
+  const { pg, errs } = await setup(game);
+  await pg.evaluate(`(${MAKE})(30,'w')`);
+  await pg.waitForFunction('window.__up.calls>=3', null, { timeout: 30000 });
+  // the same files again, in the middle of the first upload
+  await pg.evaluate(`(${MAKE})(30,'w')`);
+  await pg.waitForFunction('DR.app.images.length===30', null, { timeout: 60000 });
+  await expect.poll(async () => (await indexed(pg)).length, { timeout: 30000 }).toBe(30);
+  await pg.waitForTimeout(500);
+  expect(await pg.evaluate(() => DR.app.images.length), 'no picture was sent twice').toBe(30);
+  expect(await pg.evaluate(() => window.__up.calls), 'each file was uploaded once').toBe(30);
+  expect(errs).toEqual([]);
+});
+
+// 전체 삭제 removes the files side by side and leaves nothing behind
+test('전체 삭제 deletes every file in parallel', async ({ game }) => {
+  const { pg, errs } = await setup(game);
+  await pg.evaluate(`(${MAKE})(24,'x')`);
+  await pg.waitForFunction('DR.app.images.length===24', null, { timeout: 60000 });
+  await expect.poll(async () => (await indexed(pg)).length, { timeout: 30000 }).toBe(24);
+  await pg.evaluate(() => {
+    const ids = DR.app.images.map(x => x.id);
+    window.__deleted = [];
+    window.__delLive = 0;
+    window.__delMax = 0;
+    DR.platform.assets.list = async () => ({
+      assets: ids.map(id => ({ id })),
+      usage: { files: ids.length, maxFiles: 5000, bytes: 0, maxBytes: 1e9 },
+    });
+    DR.platform.assets.delete = async id => {
+      window.__delMax = Math.max(window.__delMax, ++window.__delLive);
+      await new Promise(r => setTimeout(r, 40));
+      window.__delLive--;
+      window.__deleted.push(id);
+    };
+    DR.mock('askConfirm', async () => true);
+    DR.mock('askPrompt', async () => String(ids.length));
+  });
+  const t0 = Date.now();
+  await pg.click('#wipeAll');
+  await pg.waitForFunction('DR.app.images.length===0', null, { timeout: 30000 });
+  const took = Date.now() - t0;
+  expect(await pg.evaluate(() => window.__deleted.length), 'every file deleted').toBe(24);
+  expect(await pg.evaluate(() => window.__delMax), 'deletes overlap').toBeGreaterThan(1);
+  expect(took, 'faster than one by one (24 x 40ms)').toBeLessThan(900);
+  expect((await indexed(pg)).length, 'the list is empty too').toBe(0);
+  expect(errs).toEqual([]);
+});
+
+// 중복 정리 applied: the copy is gone from the files, the library and the saved list
+test('중복 정리 applied leaves the library and the saved list in step', async ({ game }) => {
+  const { pg, errs } = await setup(game);
+  await pg.evaluate(() => {
+    window.__blobs = {};
+    window.__gone = [];
+    const up = DR.platform.assets.upload;
+    DR.platform.assets.upload = async (blob, o) => {
+      const r = await up(blob, o);
+      window.__blobs[r.id] = blob;
+      return r;
+    };
+    DR.platform.assets.delete = async id => {
+      window.__gone.push(id);
+    };
+    const f = window.fetch;
+    window.fetch = (u, ...a) =>
+      String(u).startsWith('/_blob/') ? Promise.resolve(new Response(window.__blobs[String(u).slice(7)])) : f(u, ...a);
+  });
+  await pg.evaluate(`(${PICS})()`);
+  await pg.waitForFunction('DR.app.images.length===4', null, { timeout: 30000 });
+  await expect.poll(async () => (await indexed(pg)).length, { timeout: 30000 }).toBe(4);
+  await pg.click('#dedupe');
+  await pg.waitForSelector('.review-list', { timeout: 30000 });
+  await pg.click('#rvOk');
+  await pg.waitForFunction('DR.app.images.length===3', null, { timeout: 30000 });
+  const mem = await pg.evaluate(() => DR.app.images.map(x => x.file));
+  // pictures sent side by side land in no fixed order, so either of the pair may be the one kept: exactly one is
+  const pair = mem.filter(f => f === 'bg_alpha_day.png' || f === 'bg_alpha-copy_day.webp');
+  expect(pair.length, 'one of the pair is left').toBe(1);
+  expect(mem).toContain('bg_alpha-eyes_day.png');
+  expect(mem).toContain('bg_other_day.png');
+  await expect.poll(async () => (await indexed(pg)).length, { timeout: 30000 }).toBe(3);
+  expect(await pg.evaluate(() => window.__gone.length)).toBe(1);
+  expect(errs).toEqual([]);
+});
+
+// the select that merges two names was white with light text (unreadable in the dark theme)
+test('the merge select has a dark background like the other selects', async ({ game }) => {
+  const { pg, errs } = await setup(game);
+  const bg = await pg.evaluate(() => {
+    const s = document.createElement('select');
+    s.className = 'mem-merge-select';
+    s.innerHTML = '<option>같은 사람과 합치기…</option>';
+    document.body.appendChild(s);
+    const cs = getComputedStyle(s);
+    return { bg: cs.backgroundColor, color: cs.color };
+  });
+  expect(bg.bg, 'not white').not.toBe('rgb(255, 255, 255)');
+  expect(bg.bg).not.toBe('rgba(0, 0, 0, 0)');
+  expect(errs).toEqual([]);
+});

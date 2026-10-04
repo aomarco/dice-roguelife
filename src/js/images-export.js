@@ -1,5 +1,6 @@
 /* ============ image pack export: a zip of the library under canonical names, plus tags.json ============ */
-import { $, noteIgnored, toast } from './util.js';
+import { noteIgnored, toast } from './util.js';
+import { setStat } from './stat.js';
 import { app } from './app.js';
 import { useCapability } from './boot.js';
 import { imgUrl, worldsOf } from './images.js';
@@ -143,9 +144,8 @@ async function save(filename, blob) {
 
 // withImages: the whole pack (pictures + tags.json); otherwise tags.json alone
 export async function exportPack(withImages) {
-  const st = $('#uplStat') || {};
   const say = t => {
-    st.textContent = t;
+    setStat(t);
   };
   const imgs = app.images.filter(x => x.kind === 'char' || x.kind === 'scene' || x.kind === 'fx');
   if (!imgs.length) {

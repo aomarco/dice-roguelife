@@ -138,6 +138,15 @@ export const IMGX = {
     };
     await Promise.all(Array.from({ length: Math.min(3, ps.length) }, worker));
   },
+  // Take pictures out of the list (they must already be gone from app.images): one write per page, pages side by side.
+  async dropMany(ids) {
+    const pages = new Set();
+    for (const id of ids) {
+      if (this.map.has(id)) pages.add(this.map.get(id));
+      this.map.delete(id);
+    }
+    await Promise.all([...pages].map(p => this.save(p)));
+  },
   async clear() {
     const ps = [...new Set(this.map.values())];
     this.map.clear();

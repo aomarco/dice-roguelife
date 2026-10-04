@@ -3539,6 +3539,11 @@ textarea.mem-edit {
 .mem-merge-select {
   max-width: 55%;
   font-size: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel2);
+  color: var(--ink);
+  border-radius: 7px;
+  padding: 4px 7px;
 }
 .mem-footer {
   font-size: 12.5px;

@@ -37,10 +37,9 @@
 새 대화에 아래 문구를 그대로 붙여 넣으세요.
 
 ```
-컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마. GitHub가 막아서 실패해.
-curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
-받은 파일이 수백 KB짜리 HTML인지(오류 문구가 아닌지) 확인한 다음,
-db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.
+아래 링크의 최신 버전 dice-roguelife.html 파일을 받아서, 내 아티팩트로 게시해 줘.
+db, sample, user, assets, downloads 기능이 모두 필요해.
+https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
 ```
 
 게시된 링크를 열면 바로 플레이할 수 있어요. 처음엔 Claude 호출 동의 창이 떠요.
@@ -50,6 +49,28 @@ db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아
 저장 데이터는 아티팩트 링크에 묶여 있어요. **새 아티팩트를 만들면 저장이 빈 채로 시작**하니, 꼭 쓰던 링크에 덮어쓰세요. 업데이트하면 화면이 새로고침되니 쓰던 입력은 먼저 보내 두세요.
 
 ```
+아래 링크의 최신 버전 dice-roguelife.html 파일을 받아서, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
+db, sample, user, assets, downloads 기능이 모두 필요해.
+https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+내 아티팩트: (여기에 내 아티팩트 링크)
+```
+
+### 막혔을 때
+
+- **"GitHub가 자동 접근을 막았다"고 하거나 파일을 받지 못했다고 하면**: 웹 읽기로 받으려 한 거예요. 아래 문구로 다시 보내세요. 컴퓨터 도구(bash)로 받게 하는 문구예요.
+
+설치:
+
+```
+컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마. GitHub가 막아서 실패해.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+받은 파일이 수백 KB짜리 HTML인지(오류 문구가 아닌지) 확인한 다음,
+db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.
+```
+
+업데이트:
+
+```
 컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마.
 curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
 받은 파일이 수백 KB짜리 HTML인지 확인한 다음, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
@@ -57,12 +78,9 @@ curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/
 내 아티팩트: (여기에 내 아티팩트 링크)
 ```
 
-### 막혔을 때
-
-- **"GitHub가 자동 접근을 막았다"**: 웹 읽기로 받으려 한 거예요. 위 문구처럼 컴퓨터 도구(bash)로 받으라고 해 주세요.
 - **`403 host_not_allowed` / `Host not in allowlist: github.com`**: 네트워크 허용이 꺼져 있거나, 켜기 전에 시작한 대화예요. 설정을 확인하고 **새 대화**에서 다시 해 보세요.
 - **새 대화에서도 막힘**: 회사나 학교 계정이면 관리자가 네트워크를 막아 뒀을 수 있어요. 직접 고른 도메인만 허용하는 설정이라면 `github.com`과 `release-assets.githubusercontent.com`을 추가해 주세요.
-- **그래도 안 되면**: 브라우저로 위 링크를 열어 `dice-roguelife.html`을 받은 뒤, 채팅에 파일을 첨부하고 "이 파일을 db, sample, user, assets, downloads, artifact 기능을 켜서 내 아티팩트로 게시해 줘"라고 보내세요.
+- **그래도 안 되면**: 브라우저로 위 링크를 열어 `dice-roguelife.html`을 받은 뒤, 채팅에 파일을 첨부하고 "이 파일을 db, sample, user, assets, downloads 기능을 켜서 내 아티팩트로 게시해 줘"라고 보내세요.
 
 ## 실행 환경
 

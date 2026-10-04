@@ -173,7 +173,7 @@
 <dl class="meta" style="display:flex;flex-wrap:wrap;gap:0.4rem 2rem;margin:0 0 1.5rem;padding:0.8rem 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);font-size:0.92rem">
   <div><dt style="display:inline;color:var(--muted-foreground)" lang="ko">실행 </dt><dd style="display:inline;margin:0" lang="ko">claude.ai 아티팩트 (내 Claude 계정)</dd></div>
   <div><dt style="display:inline;color:var(--muted-foreground)" lang="ko">언어 </dt><dd style="display:inline;margin:0" lang="ko">한국어 (English, 日本語도 선택 가능)</dd></div>
-  <div><dt style="display:inline;color:var(--muted-foreground)" lang="ko">버전 </dt><dd style="display:inline;margin:0" lang="ko">v2.4.1 기준으로 쓴 가이드</dd></div>
+  <div><dt style="display:inline;color:var(--muted-foreground)" lang="ko">버전 </dt><dd style="display:inline;margin:0" lang="ko">v2.4.2 기준으로 쓴 가이드</dd></div>
   <div><dt style="display:inline;color:var(--muted-foreground)" lang="ko">라이선스 </dt><dd style="display:inline;margin:0">MIT</dd></div>
 </dl>
 
@@ -216,10 +216,9 @@
     <p lang="ko">새 대화에 아래 문구를 그대로 붙여 넣으세요.</p>
     <div class="callout" lang="ko">
       <button class="copy" type="button" id="copyInstall"><span lang="ko">문구 복사</span></button>
-      <pre id="installText" style="margin:.7rem 0 0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);font-size:.85rem">컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마. GitHub가 막아서 실패해.
-curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
-받은 파일이 수백 KB짜리 HTML인지(오류 문구가 아닌지) 확인한 다음,
-db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.</pre>
+      <pre id="installText" style="margin:.7rem 0 0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);font-size:.85rem">아래 링크의 최신 버전 dice-roguelife.html 파일을 받아서, 내 아티팩트로 게시해 줘.
+db, sample, user, assets, downloads 기능이 모두 필요해.
+https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html</pre>
     </div>
     <p lang="ko">게시된 링크를 열면 바로 플레이할 수 있어요. 처음엔 Claude 호출 동의 창이 떠요.</p>
   </div>
@@ -228,10 +227,9 @@ db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아
     <p class="lede" lang="ko">저장 데이터는 아티팩트 링크에 묶여 있어요. <b>새 아티팩트를 만들면 저장이 빈 채로 시작</b>하니, 꼭 쓰던 링크에 덮어쓰세요. 업데이트하면 화면이 새로고침되니 쓰던 입력은 먼저 보내 두세요.</p>
     <div class="callout" lang="ko">
       <button class="copy" type="button" id="copyUpdate"><span lang="ko">문구 복사</span></button>
-      <pre id="updateText" style="margin:.7rem 0 0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);font-size:.85rem">컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마.
-curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
-받은 파일이 수백 KB짜리 HTML인지 확인한 다음, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
-기능은 db, sample, user, assets, downloads, artifact로 맞춰 줘.
+      <pre id="updateText" style="margin:.7rem 0 0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);font-size:.85rem">아래 링크의 최신 버전 dice-roguelife.html 파일을 받아서, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
+db, sample, user, assets, downloads 기능이 모두 필요해.
+https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
 내 아티팩트: (여기에 내 아티팩트 링크)</pre>
     </div>
     <ul lang="ko">
@@ -243,7 +241,26 @@ curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/
 
   <h3 lang="ko">막혔을 때</h3>
   <ul lang="ko">
-    <li><b>"GitHub가 자동 접근을 막았다"</b>고 하면 웹 읽기로 받으려 한 거예요. 위 문구처럼 컴퓨터 도구(bash)로 받으라고 해 주세요.</li>
+    <li><b>"GitHub가 자동 접근을 막았다"</b>고 하거나 파일을 받지 못했다고 하면 웹 읽기로 받으려 한 거예요. 아래 문구로 다시 보내세요. 컴퓨터 도구(bash)로 받게 하는 문구예요.</li>
+  </ul>
+  <p lang="ko"><b>설치</b></p>
+  <div class="callout" lang="ko">
+      <button class="copy" type="button" id="copyBashInstall"><span lang="ko">문구 복사</span></button>
+      <pre id="bashInstallText" style="margin:.7rem 0 0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);font-size:.85rem">컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마. GitHub가 막아서 실패해.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+받은 파일이 수백 KB짜리 HTML인지(오류 문구가 아닌지) 확인한 다음,
+db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.</pre>
+    </div>
+  <p lang="ko"><b>업데이트</b></p>
+  <div class="callout" lang="ko">
+      <button class="copy" type="button" id="copyBashUpdate"><span lang="ko">문구 복사</span></button>
+      <pre id="bashUpdateText" style="margin:.7rem 0 0;white-space:pre-wrap;word-break:break-all;font-family:var(--font-mono);font-size:.85rem">컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+받은 파일이 수백 KB짜리 HTML인지 확인한 다음, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
+기능은 db, sample, user, assets, downloads, artifact로 맞춰 줘.
+내 아티팩트: (여기에 내 아티팩트 링크)</pre>
+    </div>
+  <ul lang="ko">
     <li><b><code>403 host_not_allowed</code> / <code>Host not in allowlist: github.com</code></b>가 나오면 네트워크 허용이 꺼져 있거나, 켜기 전에 시작한 대화예요. 설정을 확인하고 <b>새 대화</b>에서 다시 해 보세요.</li>
     <li><b>새 대화에서도 막히면</b> 회사나 학교 계정에서 관리자가 네트워크를 막아 뒀을 수 있어요. 직접 고른 도메인만 허용하는 설정이라면 <code>github.com</code>과 <code>release-assets.githubusercontent.com</code>을 추가해 주세요.</li>
     <li><b>그래도 안 되면</b> 브라우저로 <a href="https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest">Releases</a>에서 <code>dice-roguelife.html</code>을 받은 뒤, 채팅에 파일을 첨부하고 "이 파일을 db, sample, user, assets, downloads, artifact 기능을 켜서 내 아티팩트로 게시해 줘"라고 보내세요.</li>
@@ -261,7 +278,7 @@ curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/
           <tr><td><code>downloads</code></td><td>이야기, 저장 파일, 이미지 팩을 파일로 내려받아요.</td><td>내보내기 버튼이 동작하지 않아요.</td></tr>
         </tbody>
       </table></div>
-      <p>문구에는 게시에 필요한 <code>artifact</code> 항목도 함께 적혀 있어요. 처음부터 모두 요청해야 일부 기능이 조용히 빠지는 일이 없어요.</p>
+      <p>처음부터 다섯 가지를 모두 요청해야 일부 기능이 조용히 빠지는 일이 없어요.</p>
     </div>
   </details>
 </section>
@@ -746,7 +763,7 @@ Also
     <b class="label">GitHub Issues</b>
     <p><a href="https://github.com/wonjoonSeol-WS/dice-roguelife/issues">github.com/wonjoonSeol-WS/dice-roguelife/issues</a>에 남겨 주세요. 아래 내용을 함께 적어 주시면 더 빨리 확인할 수 있어요.</p>
     <ul>
-      <li><b>버전</b>은 ⚙ 설정 맨 위의 "버전 v숫자"에서 확인해요 (지금은 v2.4.1).</li>
+      <li><b>버전</b>은 ⚙ 설정 맨 위의 "버전 v숫자"에서 확인해요 (지금은 v2.4.2).</li>
       <li><b>재현 순서</b>는 똑같이 따라 하면 문제가 다시 나오는 순서를 적어 주세요. <b>저장 파일을 첨부</b>해 주셔도 돼요 (저장 탭 → <b>저장 파일</b> 버튼으로 내려받아요).</li>
       <li><b>스크린샷</b>은 캡처 모드를 켜고 찍으면 이름이 가려져요.</li>
     </ul>
@@ -754,7 +771,7 @@ Also
 </section>
 
 <footer>
-  <p lang="ko">이 가이드는 v2.4.1 기준입니다. 주사위가 정한 인생 (Dice Roguelife)은 MIT 라이선스의 비공식 오픈소스 프로젝트입니다. Claude는 Anthropic의, 카카오톡은 카카오의 상표이며 이 프로젝트와 관련이 없습니다.</p>
+  <p lang="ko">이 가이드는 v2.4.2 기준입니다. 주사위가 정한 인생 (Dice Roguelife)은 MIT 라이선스의 비공식 오픈소스 프로젝트입니다. Claude는 Anthropic의, 카카오톡은 카카오의 상표이며 이 프로젝트와 관련이 없습니다.</p>
   <div class="cta">
     <a class="btn primary" href="https://github.com/wonjoonSeol-WS/dice-roguelife"><span lang="ko">GitHub에서 보기</span></a>
     <a class="btn" href="https://github.com/wonjoonSeol-WS/dice-roguelife/issues"><span lang="ko">문제 제보</span></a>
@@ -805,6 +822,8 @@ Also
   }
   wire('copyInstall', 'installText');
   wire('copyUpdate', 'updateText');
+  wire('copyBashInstall', 'bashInstallText');
+  wire('copyBashUpdate', 'bashUpdateText');
 })();
 </script>
 

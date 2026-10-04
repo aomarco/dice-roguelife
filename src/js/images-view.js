@@ -10,6 +10,7 @@ import { findManifestAsset, IMGDOC, imgError, IMGX, restoreFromManifest, SETDOC 
 import { charSetsAll, genderOf, imgUrl, setCover, setWorlds, worldChips, worldsOf } from './images.js';
 import { capTags, isGeneric, isIdTag, setIds, setTier, TIERS_CAST, toEnglishTags } from './casting.js';
 import { exportPack } from './images-export.js';
+import { setStat, statText } from './stat.js';
 import { groupSimilar, visualSig } from './image-sim.js';
 import { persist } from './persistence.js';
 import { fillTemplate, prompts } from './prompt.js';
@@ -59,7 +60,7 @@ function imagesHeaderHtml(usage, orphan, canAuto) {
    ${usage ? `<div class="img-usage"><div class="row img-usage-head"><span>${usage.files} / ${usage.maxFiles}개</span><span>${(usage.bytes / 1048576).toFixed(1)} / ${(usage.maxBytes / 1048576).toFixed(0)} MB</span></div><div class="meter"><i style="width:${Math.min(100, (usage.bytes / usage.maxBytes) * 100)}%"></i></div></div>` : ''}
    <div class="row img-toolbar"><label class="btn primary file-btn">이미지 올리기<input type="file" id="upl" accept="image/*" multiple hidden></label>
     <label class="btn file-btn">tags.json 가져오기<input type="file" id="tagsIn" accept=".json,application/json" hidden></label>
-    ${canAuto && platform.sample ? `<button class="btn" id="autoTag">자동 분류</button>` : ''}<button class="btn" id="dedupe">중복 정리</button><button class="btn" id="expPack" title="이미지를 올릴 때 쓰는 이름으로 zip에 담고 tags.json까지 넣어 내려받아요">팩 내보내기</button><button class="btn" id="expTags" title="이미지 없이 tags.json만 내려받아요">태그만 내보내기</button><button class="btn" id="saveMan" title="복제본에서 이미지 목록을 자동 복원할 수 있게 저장">복제용 목록 저장</button><button class="btn" id="tagsEn" title="한국어 등 영어가 아닌 태그를 영어로 바꿔요">태그 영어로</button><button class="btn" id="idTags" title="세트 설명에서 문파, 가문, 회사 같은 소속을 정체 태그(faction:이름)로 뽑아요. 적용 전에 목록을 보여줘요">소속 태그 뽑기</button><button class="btn danger" id="wipeAll">전체 삭제</button><span class="muted img-upl-stat" id="uplStat"></span></div>`;
+    ${canAuto && platform.sample ? `<button class="btn" id="autoTag">자동 분류</button>` : ''}<button class="btn" id="dedupe">중복 정리</button><button class="btn" id="expPack" title="이미지를 올릴 때 쓰는 이름으로 zip에 담고 tags.json까지 넣어 내려받아요">팩 내보내기</button><button class="btn" id="expTags" title="이미지 없이 tags.json만 내려받아요">태그만 내보내기</button><button class="btn" id="saveMan" title="복제본에서 이미지 목록을 자동 복원할 수 있게 저장">복제용 목록 저장</button><button class="btn" id="tagsEn" title="한국어 등 영어가 아닌 태그를 영어로 바꿔요">태그 영어로</button><button class="btn" id="idTags" title="세트 설명에서 문파, 가문, 회사 같은 소속을 정체 태그(faction:이름)로 뽑아요. 적용 전에 목록을 보여줘요">소속 태그 뽑기</button><button class="btn danger" id="wipeAll">전체 삭제</button><span class="muted img-upl-stat" id="uplStat">${esc(statText())}</span></div>`;
 }
 
 function setsSectionHtml(sets) {
@@ -148,19 +149,27 @@ function allImagesSectionHtml() {
 
 // the buttons, filters, search boxes and pagers above the sets and the grid
 function bindImagesToolbar(box) {
-  $('#upl').onchange = e => uploadFiles([...e.target.files]);
-  $('#tagsIn').onchange = e => importTags(e.target.files[0]);
+  $('#upl').onchange = e => {
+    const files = [...e.target.files];
+    e.target.value = ''; // choosing the same files again must fire again
+    exclusiveJob('올리기', () => uploadFiles(files));
+  };
+  $('#tagsIn').onchange = e => {
+    const f = e.target.files[0];
+    e.target.value = '';
+    exclusiveJob('태그 가져오기', () => importTags(f));
+  };
   const at = $('#autoTag');
-  if (at) at.onclick = autoTagAll;
-  $('#dedupe').onclick = dedupeImages;
+  if (at) at.onclick = () => exclusiveJob('자동 분류', autoTagAll);
+  $('#dedupe').onclick = () => exclusiveJob('중복 정리', dedupeImages);
   const rc = $('#recover');
-  if (rc) rc.onclick = recoverImages;
-  $('#wipeAll').onclick = wipeAllImages;
+  if (rc) rc.onclick = () => exclusiveJob('목록 복구', recoverImages);
+  $('#wipeAll').onclick = () => exclusiveJob('전체 삭제', wipeAllImages);
   $('#expPack').onclick = () => exportPack(true);
   $('#expTags').onclick = () => exportPack(false);
-  $('#saveMan').onclick = saveManifest;
-  $('#tagsEn').onclick = tagsToEnglish;
-  $('#idTags').onclick = idTagsFromDesc;
+  $('#saveMan').onclick = () => exclusiveJob('목록 저장', saveManifest);
+  $('#tagsEn').onclick = () => exclusiveJob('태그 영어로', tagsToEnglish);
+  $('#idTags').onclick = () => exclusiveJob('소속 태그', idTagsFromDesc);
   box.querySelectorAll('[data-flt]').forEach(
     b =>
       (b.onclick = () => {
@@ -619,19 +628,54 @@ function askUploadPlan(n) {
   $('#upGuess').onclick = () => answerDialog(null);
   return answer;
 }
+// One long job at a time: a second upload (or a second tab) would send the same pictures twice.
+let busy = '';
+async function exclusiveJob(name, job) {
+  if (busy) {
+    toast(`${busy} 작업이 진행 중이에요. 끝난 뒤에 다시 눌러 주세요`, 4000);
+    return;
+  }
+  busy = name;
+  try {
+    if (!navigator.locks) return await job();
+    let started = false;
+    try {
+      return await navigator.locks.request('dr-image-job', { ifAvailable: true }, async lock => {
+        if (!lock) {
+          toast('다른 화면에서 이미지 작업을 하는 중이에요. 끝난 뒤에 다시 해 주세요', 4500);
+          return;
+        }
+        started = true;
+        return await job();
+      });
+    } catch (e) {
+      if (started) throw e;
+      return await job(); // locks are not available in this page: go on without them
+    }
+  } finally {
+    busy = '';
+  }
+}
+// run fn over items, a few at a time
+async function inParallel(items, n, fn) {
+  const queue = [...items];
+  const worker = async () => {
+    while (queue.length) await fn(queue.shift());
+  };
+  await Promise.all(Array.from({ length: Math.min(n, queue.length) }, worker));
+}
 const UPLOAD_PAR = 3; // pictures sent at the same time (it drops to 1 when uploads start failing, and climbs back)
 const UPLOAD_RETRIES = 2;
 const MAX_UNSAVED = 9; // pictures sent but not yet in the saved list: the most a closed window could lose
 const NO_RETRY = new Set(['quota_or_state', 'quota_exceeded', 'too_large']);
 const wait = ms => new Promise(r => setTimeout(r, ms));
 async function uploadFiles(files) {
-  const st = $('#uplStat');
   let done = 0,
     skipped = 0,
     stop = false;
   const failed = [],
     landed = [];
-  await fillHashes(t => (st.textContent = t), '기존 이미지 확인 중');
+  await fillHashes(t => setStat(t), '기존 이미지 확인 중');
   const t0 = Date.now();
   const unnamed = files.filter(f => parseName(f.name, true).guessed);
   const plan = unnamed.length ? await askUploadPlan(unnamed.length) : null;
@@ -657,7 +701,9 @@ async function uploadFiles(files) {
   };
   const say = () => {
     const el = done ? Math.round((((Date.now() - t0) / done) * (files.length - done)) / 1000) : 0;
-    st.textContent = `${done}/${files.length} 올리는 중${skipped ? `, 건너뜀 ${skipped}` : ''}${failed.length ? `, 실패 ${failed.length}` : ''}${el > 5 ? `, 약 ${el >= 60 ? Math.round(el / 60) + '분' : el + '초'} 남음` : ''}`;
+    setStat(
+      `${done}/${files.length} 올리는 중${skipped ? `, 건너뜀 ${skipped}` : ''}${failed.length ? `, 실패 ${failed.length}` : ''}${el > 5 ? `, 약 ${el >= 60 ? Math.round(el / 60) + '분' : el + '초'} 남음` : ''}`,
+    );
   };
   const sendWithRetry = async (blob, f) => {
     for (let attempt = 0; ; attempt++) {
@@ -813,7 +859,7 @@ async function uploadFiles(files) {
       logErr('upload', e);
     }
   }
-  st.textContent = '';
+  setStat('');
   if (time.n >= 5) {
     const avg = ms => Math.round(ms / time.n);
     const msg = `장당 평균: 압축 ${avg(time.compress)}ms, 업로드 ${avg(time.upload)}ms, 목록 저장 ${avg(time.save)}ms (동시 ${UPLOAD_PAR}개)`;
@@ -930,10 +976,9 @@ async function idTagsFromDesc() {
     ))
   )
     return;
-  const st = $('#uplStat');
   const found = [];
   for (let i = 0; i < ks.length; i += 25) {
-    st.textContent = `소속 찾는 중 ${Math.min(i + 25, ks.length)}/${ks.length}`;
+    setStat(`소속 찾는 중 ${Math.min(i + 25, ks.length)}/${ks.length}`);
     const part = ks.slice(i, i + 25);
     try {
       const r = await platform.sample.json(
@@ -953,7 +998,7 @@ async function idTagsFromDesc() {
       logErr('idtags', e);
     }
   }
-  st.textContent = '';
+  setStat('');
   if (!found.length) {
     toast('설명에서 소속을 찾지 못했어요');
     return;
@@ -978,12 +1023,12 @@ async function idTagsFromDesc() {
   }
   try {
     await IMGX.flush(touched, (n, t) => {
-      $('#uplStat').textContent = `저장 중 ${n}/${t}`;
+      setStat(`저장 중 ${n}/${t}`);
     });
   } catch (e) {
     toast('저장 실패: ' + (e.code || e.message));
   }
-  $('#uplStat').textContent = '';
+  setStat('');
   toast(`세트 ${sel.length}개에 소속 태그 적용`, 4000);
   renderImages();
 }
@@ -1015,10 +1060,9 @@ async function tagsToEnglish() {
     ))
   )
     return;
-  const st = $('#uplStat');
   const map = new Map();
   for (let i = 0; i < descSets.length; i += 25) {
-    st.textContent = `설명 정리 중 ${Math.min(i + 25, descSets.length)}/${descSets.length}`;
+    setStat(`설명 정리 중 ${Math.min(i + 25, descSets.length)}/${descSets.length}`);
     const part = descSets.slice(i, i + 25);
     try {
       const r = await platform.sample.json(
@@ -1046,7 +1090,7 @@ async function tagsToEnglish() {
     }
   }
   for (let i = 0; i < uniq.length; i += 60) {
-    st.textContent = `번역 중 ${Math.min(i + 60, uniq.length)}/${uniq.length}`;
+    setStat(`번역 중 ${Math.min(i + 60, uniq.length)}/${uniq.length}`);
     const part = uniq.slice(i, i + 60);
     const out = await toEnglishTags(part);
     part.forEach((t, j) => {
@@ -1054,7 +1098,7 @@ async function tagsToEnglish() {
       if (e && e !== t && !/[^\x00-\x7F]/.test(e)) map.set(t, e.toLowerCase());
     });
   }
-  st.textContent = '';
+  setStat('');
   if (map.size) {
     const sel = await askReview('번역 결과예요. 고유명사가 바뀌었으면 체크를 풀어 주세요 (풀린 건 그대로 남아요).', [
       ...map.entries(),
@@ -1071,12 +1115,12 @@ async function tagsToEnglish() {
   }
   try {
     await IMGX.flush(touched, (n, t) => {
-      st.textContent = `저장 중 ${n}/${t}`;
+      setStat(`저장 중 ${n}/${t}`);
     });
   } catch (e) {
     toast('저장 실패: ' + (e.code || e.message));
   }
-  st.textContent = '';
+  setStat('');
   toast(
     `${map.size}종류 번역, 이미지 ${touched.length}장 갱신${uniq.length - map.size ? `, 고유명사 등 ${uniq.length - map.size}종류는 그대로` : ''}`,
     5000,
@@ -1092,9 +1136,8 @@ export async function importTags(file) {
     toast('JSON을 읽을 수 없어요');
     return;
   }
-  const st = $('#uplStat') || {};
   const say = t => {
-    st.textContent = t;
+    setStat(t);
   };
   let ns = 0,
     nb = 0,
@@ -1234,6 +1277,21 @@ async function wipeAllImages() {
     toast('오류: ' + ((e && (e.code || e.message)) || e), 5000);
   }
 }
+// delete one stored file; a failed delete is tried again twice, then skipped
+async function deleteAsset(id) {
+  for (let i = 0; ; i++) {
+    try {
+      await platform.assets.delete(id);
+      return;
+    } catch (e) {
+      if (i >= 2) {
+        noteIgnored('delete asset', e);
+        return;
+      }
+      await wait(500 * 2 ** i);
+    }
+  }
+}
 async function wipeAllImagesInner() {
   let list = [];
   try {
@@ -1249,35 +1307,30 @@ async function wipeAllImagesInner() {
   }
   if (!(await askConfirm(`저장소의 이미지 ${total}장과 목록을 모두 지울까요? 되돌릴 수 없습니다.`))) return;
   if ((await askPrompt(`확인을 위해 ${total} 을 입력하세요`)) !== String(total)) return;
-  const st = $('#uplStat');
   let n = 0;
-  for (const a of list) {
-    st.textContent = `${++n}/${total} 삭제 중`;
-    try {
-      await platform.assets.delete(a.id);
-    } catch (e) {
-      noteIgnored('wipe images: asset', e);
-    }
-  }
+  await inParallel(list, 6, async a => {
+    setStat(`${++n}/${total} 삭제 중`);
+    await deleteAsset(a.id);
+  });
   await IMGX.clear().catch(e => noteIgnored('images-view: IMGX.clear', e));
-  for (const k of Object.keys(app.setMeta))
-    await SETDOC(k)
+  await inParallel(Object.keys(app.setMeta), 8, k =>
+    SETDOC(k)
       .delete()
-      .catch(e => noteIgnored('images-view: SETDOC.delete', e));
+      .catch(e => noteIgnored('images-view: SETDOC.delete', e)),
+  );
   app.images = [];
   app.setMeta = {};
   app.settings.dupMap = {};
   await saveSettings();
-  st.textContent = '';
+  setStat('');
   toast('모두 지웠어요. 이제 새로 올리세요');
   renderImages();
 }
 async function saveManifest() {
-  const st = $('#uplStat') || {};
   let n = 0;
   for (const x of app.images) {
     if (!x.shash) {
-      st.textContent = `${++n} 해시 계산 중`;
+      setStat(`${++n} 해시 계산 중`);
       try {
         x.shash = await sha256Hex(await (await fetch(imgUrl(x.id))).blob());
         await IMGDOC(x.id).set(x);
@@ -1305,24 +1358,23 @@ async function saveManifest() {
     const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
     await platform.assets.upload(blob, { type: 'application/json' });
     if (old) await platform.assets.delete(old.asset.id).catch(e => noteIgnored('images-view: ASSETS.delete', e));
-    st.textContent = '';
+    setStat('');
     toast(`복제용 목록 저장됨 (${items.length}장)`);
   } catch (e) {
-    st.textContent = '';
+    setStat('');
     toast('저장 실패: ' + (e.code || e.message));
   }
 }
 async function recoverImages() {
   const m = await findManifestAsset();
   if (m) {
-    const hit = await restoreFromManifest(m.data, t => ($('#uplStat').textContent = t));
+    const hit = await restoreFromManifest(m.data, t => setStat(t));
     if (hit) {
       toast(`목록 ${hit}장을 복제용 목록에서 복원했어요`);
       renderImages();
       return;
     }
   }
-  const st = $('#uplStat');
   let list;
   try {
     list = (await platform.assets.list()).assets;
@@ -1337,7 +1389,7 @@ async function recoverImages() {
   }
   let n = 0;
   for (const a of missing) {
-    st.textContent = `${++n}/${missing.length} 복구 중`;
+    setStat(`${++n}/${missing.length} 복구 중`);
     let portrait = false;
     try {
       const bmp = await createImageBitmap(await (await fetch(a.url || imgUrl(a.id))).blob());
@@ -1364,7 +1416,7 @@ async function recoverImages() {
       break;
     }
   }
-  st.textContent = '';
+  setStat('');
   toast(`${n}장 복구했어요. 자동 분류로 태그를 달아 주세요`);
   renderImages();
 }
@@ -1386,9 +1438,8 @@ async function fillHashes(say, label) {
 const imgLabel = x => (x.file && x.file !== x.name ? `${x.name} [${x.file}]` : x.name || x.file || x.id);
 const byOldest = (a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
 async function dedupeImages() {
-  const st = $('#uplStat');
   const say = t => {
-    st.textContent = t;
+    setStat(t);
   };
   await fillHashes(say, '검사 중');
   // 1) the very same stored file
@@ -1448,19 +1499,14 @@ async function dedupeImages() {
     return t;
   };
   let done = 0;
-  for (const [d] of chosen) {
+  await inParallel(chosen, 6, async ([d]) => {
     say(`${++done}/${chosen.length} 정리 중`);
-    try {
-      await platform.assets.delete(d.id);
-    } catch (e) {
-      noteIgnored('dedupe images: delete an asset', e);
-    }
-    await IMGDOC(d.id)
-      .delete()
-      .catch(e => noteIgnored('images-view: IMGDOC.delete', e));
+    await deleteAsset(d.id);
     app.settings.dupMap[d.id] = final(d.id);
-    app.images = app.images.filter(i => i.id !== d.id);
-  }
+  });
+  const removed = new Set(chosen.map(([d]) => d.id));
+  app.images = app.images.filter(i => !removed.has(i.id));
+  await IMGX.dropMany([...removed]).catch(e => noteIgnored('images-view: IMGX.dropMany', e));
   for (const [a, b] of Object.entries(app.settings.dupMap)) if (redirect.has(b)) app.settings.dupMap[a] = final(b);
   await saveSettings();
   say('');
@@ -1474,10 +1520,9 @@ async function autoTagAll() {
     toast('자동 분류할 이미지가 없어요');
     return;
   }
-  const st = $('#uplStat');
   let n = 0;
   for (const x of todo) {
-    st.textContent = `${++n}/${todo.length} 분류 중`;
+    setStat(`${++n}/${todo.length} 분류 중`);
     try {
       const blob = await (await fetch(imgUrl(x.id))).blob();
       const r = await platform.sample.json(fillTemplate(prompts.autotag, { emos: EMOS.join('|') }), {
@@ -1516,6 +1561,6 @@ async function autoTagAll() {
       }
     }
   }
-  st.textContent = '';
+  setStat('');
   renderImages();
 }
