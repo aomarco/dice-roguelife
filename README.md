@@ -5,8 +5,10 @@
 > 화면 캡처와 함께 시작하는 법, 주사위 모드, 이미지 설정 방법을 설명해요. 설치 방법은 바로 아래에 있어요.
 
 > ## 🎁 샘플 이미지 팩 (무료 에셋)
-> 바로 쓸 수 있는 예제 파일이에요. 더 추가할 예정이에요.
-> **[sample-pack.zip 받기](https://github.com/wonjoonSeol-WS/dice-roguelife/releases/download/free-pack-v1/sample-pack.zip)** (그림자 이미지와 태그 파일이 한 파일에 들어 있어요)
+> 바로 쓸 수 있는 예제 파일이에요. **그림자 이미지 6장**과 태그 파일(캐릭터 3명 9장, 배경 4장)이 들어 있어요.
+> **[sample-pack.zip 받기](https://github.com/wonjoonSeol-WS/dice-roguelife/releases/download/free-pack-v1/sample-pack.zip)**
+>
+> 무료 에셋이라 수가 많지 않아요. **이미지 기여는 환영합니다!** 방법은 [가이드 사이트](https://wonjoonseol-ws.github.io/dice-roguelife/)의 "이미지 기여 환영"을 봐 주세요.
 
 세계, 종족, 신분, 재능을 주사위가 정하고, Claude가 웹소설 문체로 그 삶을 서술하는 한국어 텍스트 로그라이크입니다.
 플레이어는 대사와 행동을 입력하고, 결과가 갈리는 순간에는 d100 판정이 굴러갑니다. 죽으면 회귀해서 다른 세계의 다른
