@@ -30,6 +30,8 @@
 3. **네트워크 허용(Allow network egress)** 켜기
 4. 설정을 바꿨다면 **새 대화**를 열어서 진행하세요. 이미 열려 있던 대화에는 바뀐 설정이 적용되지 않아요.
 
+![Claude 설정 → 기능(Capabilities): 코드 실행 및 파일 생성과 네트워크 허용(Allow network egress)을 켜요](docs/images/egress-setting.png)
+
 ### 설치
 
 새 대화에 아래 문구를 그대로 붙여 넣으세요.
