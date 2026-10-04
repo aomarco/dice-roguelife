@@ -2,7 +2,7 @@
 
 > ## 📖 사용법은 가이드 사이트에서 보세요
 > **https://wonjoonseol-ws.github.io/dice-roguelife/**
-> 화면 캡처와 함께 시작하는 법, 주사위 모드, 이미지 설정 방법을 설명해요. 설치 방법은 바로 아래에 있어요.
+> 화면 캡처와 함께 시작하는 법, 주사위 모드, 이미지 설정 방법을 설명해요. 설치와 업데이트 방법은 바로 아래에 있어요.
 
 > ## 🎁 샘플 이미지 팩 (무료 에셋)
 > 바로 쓸 수 있는 예제 파일이에요. **그림자 이미지 6장**과 태그 파일(캐릭터 3명 9장, 배경 4장)이 들어 있어요.
@@ -21,22 +21,46 @@
 - 캐릭터 초상화와 배경을 직접 올려 장면에 붙이는 이미지 라이브러리
 - 인생 결산과 전당, 이야기 내보내기(Markdown, HTML), 저장 파일 내보내기와 가져오기
 
-## 빠른 설치 방법
+## 설치와 업데이트 (Claude 앱에서, 폰도 가능)
 
-1. [claude.ai](https://claude.ai)에서 새 대화를 열어요.
-2. 아래 문구를 **그대로 복사해서 붙여넣어요.**
+### 준비 (처음 한 번만)
+
+1. Claude 앱 설정 → 기능(Capabilities)
+2. **코드 실행 및 파일 생성** 켜기
+3. **네트워크 허용(Allow network egress)** 켜기
+4. 설정을 바꿨다면 **새 대화**를 열어서 진행하세요. 이미 열려 있던 대화에는 바뀐 설정이 적용되지 않아요.
+
+### 설치
+
+새 대화에 아래 문구를 그대로 붙여 넣으세요.
 
 ```
-아래 링크의 최신 버전 dice-roguelife.html 파일을 받아서, 내 아티팩트로 게시해 줘.
-db, sample, user, assets, downloads 기능이 모두 필요해.
-https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마. GitHub가 막아서 실패해.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+받은 파일이 수백 KB짜리 HTML인지(오류 문구가 아닌지) 확인한 다음,
+db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.
 ```
 
-3. Claude가 만들어 준 링크를 **즐겨찾기에 저장**하고, 그 링크에서 플레이해요.
+게시된 링크를 열면 바로 플레이할 수 있어요. 처음엔 Claude 호출 동의 창이 떠요.
 
-- 링크를 받을 수 없다고 하면 [Releases](https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest)에서 `dice-roguelife.html`을 내려받아 대화에 첨부하고 같은 문구를 보내요.
-- 저장은 그 링크에 묶여요. 나중에 새 버전으로 바꿀 때도 **새 아티팩트를 만들지 말고 같은 링크에 덮어써요.** 방법은 아래 [업데이트 방법](#업데이트-방법)이에요.
-- 화면과 사용법은 [가이드 사이트](https://wonjoonseol-ws.github.io/dice-roguelife/)에서 볼 수 있어요.
+### 업데이트
+
+저장 데이터는 아티팩트 링크에 묶여 있어요. **새 아티팩트를 만들면 저장이 빈 채로 시작**하니, 꼭 쓰던 링크에 덮어쓰세요. 업데이트하면 화면이 새로고침되니 쓰던 입력은 먼저 보내 두세요.
+
+```
+컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+받은 파일이 수백 KB짜리 HTML인지 확인한 다음, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
+기능은 db, sample, user, assets, downloads, artifact로 맞춰 줘.
+내 아티팩트: (여기에 내 아티팩트 링크)
+```
+
+### 막혔을 때
+
+- **"GitHub가 자동 접근을 막았다"**: 웹 읽기로 받으려 한 거예요. 위 문구처럼 컴퓨터 도구(bash)로 받으라고 해 주세요.
+- **`403 host_not_allowed` / `Host not in allowlist: github.com`**: 네트워크 허용이 꺼져 있거나, 켜기 전에 시작한 대화예요. 설정을 확인하고 **새 대화**에서 다시 해 보세요.
+- **새 대화에서도 막힘**: 회사나 학교 계정이면 관리자가 네트워크를 막아 뒀을 수 있어요. 직접 고른 도메인만 허용하는 설정이라면 `github.com`과 `release-assets.githubusercontent.com`을 추가해 주세요.
+- **그래도 안 되면**: 브라우저로 위 링크를 열어 `dice-roguelife.html`을 받은 뒤, 채팅에 파일을 첨부하고 "이 파일을 db, sample, user, assets, downloads, artifact 기능을 켜서 내 아티팩트로 게시해 줘"라고 보내세요.
 
 ## 실행 환경
 
@@ -71,19 +95,6 @@ https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-r
 
 서술 프롬프트는 빌드할 때 `prompts.json`에서 페이지 안에 들어갑니다. 아티팩트 데이터베이스의 `config/prompt` 문서가
 있으면 그 값이 항목별로 우선합니다(자세한 내용은 [RELEASING.md](RELEASING.md)).
-
-## 업데이트 방법
-
-**새 아티팩트를 만들지 말고, 같은 링크에 덮어써야 저장이 그대로 남아요.**
-
-1. ⚙ 설정에서 **업데이트 확인**을 눌러요.
-2. 내 아티팩트 링크를 붙여 넣어요.
-3. **문구 복사**를 누르고, Claude 새 대화에 붙여 넣어요.
-4. Claude가 같은 링크에 새 버전을 덮어써 줘요.
-
-불안하면 먼저 저장 탭에서 저장 파일을 내보내 두세요.
-
-![업데이트 확인 창](docs/images/update-sheet-ko.png)
 
 ## 비용: 크랙 같은 챗 서비스와 비교
 
