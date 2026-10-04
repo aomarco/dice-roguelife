@@ -10,6 +10,7 @@ import { findManifestAsset, IMGDOC, imgError, IMGX, restoreFromManifest, SETDOC 
 import { charSetsAll, genderOf, imgUrl, setCover, setWorlds, worldChips, worldsOf } from './images.js';
 import { capTags, isGeneric, isIdTag, setIds, setTier, TIERS_CAST, toEnglishTags } from './casting.js';
 import { exportPack } from './images-export.js';
+import { groupSimilar, visualSig } from './image-sim.js';
 import { persist } from './persistence.js';
 import { fillTemplate, prompts } from './prompt.js';
 
@@ -521,22 +522,33 @@ function parseName(fname, portrait) {
     return { kind: 'scene', name: parts.slice(1).join('_') || base, tags: parts.slice(1) };
   if (/^(dice|fx)/.test(parts[0] || '')) return { kind: 'fx', name: base.toLowerCase(), tags: parts };
   if (/^(shadow|generic|silhouette)$/.test(parts[0] || '')) {
-    const g = /^(female|woman|women|girl)/.test(parts[1] || '')
-      ? 'female'
-      : /^(male|man|men|boy)/.test(parts[1] || '')
-        ? 'male'
-        : 'other';
-    const rest = parts.slice(2);
+    const gender = w =>
+      /^(female|woman|women|girl)/.test(w) ? 'female' : /^(male|man|men|boy)/.test(w) ? 'male' : null;
+    // shadow_{male|female}_..., or with a style word first: shadow_cyber_male_... (its own set shadow_cyber_male)
+    let g = gender(parts[1] || ''),
+      at = 1,
+      style = '';
+    if (
+      !g &&
+      /^[a-z0-9-]+$/.test(parts[1] || '') &&
+      /^(female|woman|women|girl|male|man|men|boy)$/.test(parts[2] || '')
+    ) {
+      style = parts[1];
+      g = gender(parts[2]);
+      at = 2;
+    }
+    const rest = g ? parts.slice(at + 1) : parts.slice(2);
+    if (!g) g = 'other';
     const e0 = splitEmoNum(rest[0]);
     if (e0) rest.splice(0, 1, ...(e0.num ? [e0.num] : []));
     const emo = e0 ? e0.emo : 'neutral';
     return {
       kind: 'char',
-      set: 'shadow_' + g,
+      set: 'shadow_' + (style ? style + '_' : '') + g,
       emotion: emo,
       variant: rest.join('_'),
       name: base.toLowerCase(),
-      tags: ['shadow', 'silhouette'],
+      tags: ['shadow', 'silhouette', ...(style ? [style] : [])],
       shadowGender: g,
     };
   }
@@ -607,30 +619,86 @@ function askUploadPlan(n) {
   $('#upGuess').onclick = () => answerDialog(null);
   return answer;
 }
+const UPLOAD_PAR = 3; // pictures sent at the same time (it drops to 1 when uploads start failing, and climbs back)
+const UPLOAD_RETRIES = 2;
+const MAX_UNSAVED = 9; // pictures sent but not yet in the saved list: the most a closed window could lose
+const NO_RETRY = new Set(['quota_or_state', 'quota_exceeded', 'too_large']);
+const wait = ms => new Promise(r => setTimeout(r, ms));
 async function uploadFiles(files) {
   const st = $('#uplStat');
-  let n = 0,
-    skipped = 0;
+  let done = 0,
+    skipped = 0,
+    stop = false;
   const failed = [],
     landed = [];
+  await fillHashes(t => (st.textContent = t), '기존 이미지 확인 중');
   const t0 = Date.now();
   const unnamed = files.filter(f => parseName(f.name, true).guessed);
   const plan = unnamed.length ? await askUploadPlan(unnamed.length) : null;
   let sharedKey = null;
   const newSets = new Set();
-  for (const f of files) {
-    const el = n ? Math.round((((Date.now() - t0) / n) * (files.length - n)) / 1000) : 0;
-    st.textContent = `${++n}/${files.length} 올리는 중${skipped ? `, 건너뜀 ${skipped}` : ''}${failed.length ? `, 실패 ${failed.length}` : ''}${el > 5 ? `, 약 ${el >= 60 ? Math.round(el / 60) + '분' : el + '초'} 남음` : ''}`;
-    try {
-      const hash = await sha256Hex(f).catch(() => null);
-      // an exported pack holds the stored (already compressed) files under new names: they match by the stored file hash
-      if (app.images.some(x => (hash && (x.hash === hash || x.shash === hash)) || x.file === f.name)) {
-        skipped++;
-        continue;
+  const inflight = new Set(); // names and hashes being sent right now: the same file twice in one batch
+  const time = { n: 0, compress: 0, upload: 0, save: 0 }; // milliseconds, to see where the time goes
+  let par = UPLOAD_PAR,
+    okRun = 0,
+    running = 0,
+    unsaved = 0;
+  const saves = [];
+  const fail = (f, e) => {
+    failed.push([
+      f.name,
+      e.code === 'quota_or_state'
+        ? '저장 공간 가득'
+        : e.code === 'too_large'
+          ? '파일이 너무 큼'
+          : e.code || e.message || '실패',
+    ]);
+    if (e.code === 'quota_or_state' || e.code === 'quota_exceeded') stop = true;
+  };
+  const say = () => {
+    const el = done ? Math.round((((Date.now() - t0) / done) * (files.length - done)) / 1000) : 0;
+    st.textContent = `${done}/${files.length} 올리는 중${skipped ? `, 건너뜀 ${skipped}` : ''}${failed.length ? `, 실패 ${failed.length}` : ''}${el > 5 ? `, 약 ${el >= 60 ? Math.round(el / 60) + '분' : el + '초'} 남음` : ''}`;
+  };
+  const sendWithRetry = async (blob, f) => {
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await platform.assets.upload(blob, { type: blob.type || f.type });
+      } catch (e) {
+        if (NO_RETRY.has(e.code) || attempt >= UPLOAD_RETRIES) throw e;
+        par = Math.max(1, par - 1); // maybe too many at once: slow down, then try the same picture again
+        okRun = 0;
+        await wait(1000 * 2 ** attempt);
       }
+    }
+  };
+  const one = async (f, lane) => {
+    const hash = await sha256Hex(f).catch(() => null);
+    // an exported pack holds the stored (already compressed) files under new names: they match by the stored file hash
+    if (
+      app.images.some(x => (hash && (x.hash === hash || x.shash === hash)) || x.file === f.name) ||
+      inflight.has(f.name) ||
+      (hash && inflight.has(hash))
+    ) {
+      skipped++;
+      return;
+    }
+    inflight.add(f.name);
+    if (hash) inflight.add(hash);
+    let row = null;
+    try {
+      let t = performance.now();
       const { blob, portrait } = await compress(f);
-      const r = await platform.assets.upload(blob, { type: blob.type || f.type });
+      time.compress += performance.now() - t;
+      t = performance.now();
+      const r = await sendWithRetry(blob, f);
+      time.upload += performance.now() - t;
+      if (++okRun >= 20 && par < UPLOAD_PAR) {
+        par++;
+        okRun = 0;
+      }
       const shash = await sha256Hex(blob).catch(() => null); // no hash: this upload just skips the duplicate check
+      // From here to the push there is no await: set names are picked from what the list holds right now, so two
+      // pictures sent at the same time never get the same new set.
       let parsed = parseName(f.name, portrait);
       let guessed = !!parsed.guessed;
       delete parsed.guessed;
@@ -640,15 +708,11 @@ async function uploadFiles(files) {
         parsed.name = key + '_neutral';
         newSets.add(key);
       } // a Korean file name cannot be a set key
+      let shadow = null;
       if (parsed.shadowGender) {
-        const g = parsed.shadowGender;
+        shadow = parsed.shadowGender;
         delete parsed.shadowGender;
-        app.setMeta[parsed.set] = Object.assign(app.setMeta[parsed.set] || {}, { gender: g, tier: 'generic' });
-        try {
-          await SETDOC(parsed.set).set(app.setMeta[parsed.set]);
-        } catch (e) {
-          logErr('upload', e);
-        }
+        app.setMeta[parsed.set] = Object.assign(app.setMeta[parsed.set] || {}, { gender: shadow, tier: 'generic' });
       }
       if (guessed && plan) {
         const base = f.name.replace(/\.[^.]+$/, '');
@@ -661,21 +725,82 @@ async function uploadFiles(files) {
         } else if (plan.kind === 'scene') parsed = { kind: 'scene', name: base.toLowerCase(), tags: [] };
         else parsed = { kind: 'fx', name: base.toLowerCase(), tags: plan.fx || ['dice'] };
       }
-      const row = Object.assign({ id: r.id, world: 'any', file: f.name, hash, shash, createdAt: nowIso() }, parsed);
-      await IMGDOC(r.id).set(row);
+      row = Object.assign({ id: r.id, world: 'any', file: f.name, hash, shash, createdAt: nowIso() }, parsed);
+      const page = IMGX.laneAssign(row.id, lane);
       app.images.push(row);
-      landed.push({ file: f.name, row, guessed });
+      const mine = row,
+        setKey = parsed.set;
+      row = null; // from here the save below owns the picture (and its rollback)
+      unsaved++;
+      const t1 = performance.now();
+      // the list is written right away; pictures that land while it runs ride in the next write. The next upload does not wait.
+      saves.push(
+        IMGX.save(page)
+          .then(
+            async () => {
+              time.save += performance.now() - t1;
+              time.n++;
+              landed.push({ file: f.name, row: mine, guessed });
+              if (shadow)
+                await SETDOC(setKey)
+                  .set(app.setMeta[setKey])
+                  .catch(e => logErr('upload', e));
+            },
+            e => {
+              app.images = app.images.filter(x => x !== mine); // the list write failed: the picture is not in the library
+              IMGX.map.delete(mine.id);
+              fail(f, e);
+            },
+          )
+          .finally(() => unsaved--),
+      );
     } catch (e) {
-      failed.push([
-        f.name,
-        e.code === 'quota_or_state'
-          ? '저장 공간 가득'
-          : e.code === 'too_large'
-            ? '파일이 너무 큼'
-            : e.code || e.message || '실패',
-      ]);
-      if (e.code === 'quota_or_state' || e.code === 'quota_exceeded') break;
+      if (row) {
+        app.images = app.images.filter(x => x !== row); // the list write failed: the picture is not in the library
+        IMGX.map.delete(row.id);
+      }
+      throw e;
+    } finally {
+      inflight.delete(f.name);
+      if (hash) inflight.delete(hash);
     }
+  };
+  IMGX.lanes = [];
+  const queue = files.map((f, i) => [f, i % UPLOAD_PAR]); // each picture is tied to a lane (its own list page)
+  const worker = async () => {
+    while (queue.length && !stop) {
+      if (running >= par) {
+        await wait(50);
+        continue;
+      }
+      if (unsaved >= MAX_UNSAVED) {
+        await wait(20);
+        continue;
+      }
+      const [f, lane] = queue.shift();
+      running++;
+      try {
+        await one(f, lane);
+      } catch (e) {
+        fail(f, e);
+      } finally {
+        running--;
+        done++;
+        say();
+      }
+    }
+  };
+  const guard = e => {
+    e.preventDefault();
+    e.returnValue = ''; // leaving now would lose the pictures still being sent
+  };
+  window.addEventListener('beforeunload', guard);
+  say();
+  try {
+    await Promise.all(Array.from({ length: UPLOAD_PAR }, worker));
+    await Promise.all(saves);
+  } finally {
+    window.removeEventListener('beforeunload', guard);
   }
   for (const key of newSets) {
     const m = (app.setMeta[key] = Object.assign(
@@ -689,6 +814,12 @@ async function uploadFiles(files) {
     }
   }
   st.textContent = '';
+  if (time.n >= 5) {
+    const avg = ms => Math.round(ms / time.n);
+    const msg = `장당 평균: 압축 ${avg(time.compress)}ms, 업로드 ${avg(time.upload)}ms, 목록 저장 ${avg(time.save)}ms (동시 ${UPLOAD_PAR}개)`;
+    console.info('[upload]', msg);
+    toast(msg, 6000);
+  }
   if (skipped) toast(`이미 있는 이미지 ${skipped}장은 건너뛰었어요`);
   if (newSets.size) toast(`새 세트 ${[...newSets].join(', ')}로 들어갔어요`, 4000);
   if (landed.length) {
@@ -1237,19 +1368,30 @@ async function recoverImages() {
   toast(`${n}장 복구했어요. 자동 분류로 태그를 달아 주세요`);
   renderImages();
 }
-async function dedupeImages() {
-  const st = $('#uplStat');
-  let n = 0;
+// the hash of each stored file: a row saved by an older version has none, and the skip check and the dedupe need it
+async function fillHashes(say, label) {
   const todo = app.images.filter(x => !x.shash);
+  let n = 0;
   for (const x of todo) {
-    st.textContent = `${++n}/${todo.length} 검사 중`;
+    say(`${++n}/${todo.length} ${label}`);
     try {
       x.shash = await sha256Hex(await (await fetch(imgUrl(x.id))).blob());
-      await IMGDOC(x.id).set(x);
     } catch (e) {
-      noteIgnored('dedupe images: hash', e);
+      noteIgnored('image hash backfill', e);
     }
   }
+  const ok = todo.filter(x => x.shash).map(x => x.id);
+  if (ok.length) await IMGX.flush(ok, (i, t) => say(`저장 중 ${i}/${t}`));
+}
+const imgLabel = x => (x.file && x.file !== x.name ? `${x.name} [${x.file}]` : x.name || x.file || x.id);
+const byOldest = (a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+async function dedupeImages() {
+  const st = $('#uplStat');
+  const say = t => {
+    st.textContent = t;
+  };
+  await fillHashes(say, '검사 중');
+  // 1) the very same stored file
   const groups = {};
   for (const x of app.images) {
     const k = x.shash || 'file:' + (x.file || x.name);
@@ -1258,24 +1400,56 @@ async function dedupeImages() {
   const dups = [];
   for (const g of Object.values(groups)) {
     if (g.length < 2) continue;
-    g.sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
-    for (const d of g.slice(1)) dups.push([d, g[0]]);
+    g.sort(byOldest);
+    for (const d of g.slice(1)) dups.push([d, g[0], '같은 파일']);
   }
-  st.textContent = '';
+  // 2) the same picture stored again (compressed once more, renamed): compare how they look
+  const gone = new Set(dups.map(([d]) => d.id));
+  const left = app.images.filter(x => !gone.has(x.id));
+  const items = [],
+    sigs = [];
+  const queue = [...left];
+  let n = 0;
+  const worker = async () => {
+    while (queue.length) {
+      const x = queue.shift();
+      say(`${++n}/${left.length} 모양 비교 중`);
+      try {
+        sigs.push(await visualSig(await (await fetch(imgUrl(x.id))).blob()));
+        items.push(x);
+      } catch (e) {
+        noteIgnored('dedupe images: look', e);
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  for (const g of groupSimilar(sigs)) {
+    const xs = g.map(i => items[i]).sort(byOldest);
+    for (const d of xs.slice(1)) dups.push([d, xs[0], '같은 그림']);
+  }
+  say('');
   if (!dups.length) {
     toast('중복 이미지가 없어요');
     return;
   }
-  if (
-    !(await askConfirm(
-      `중복 이미지 ${dups.length}장을 지울까요? 먼저 올린 쪽만 남깁니다. 지난 기록의 이미지는 남은 쪽으로 연결돼요.`,
-    ))
-  )
-    return;
+  const pairs = dups.map(([d, , why]) => [`${imgLabel(d)} (${why})`, '']);
+  dups.forEach(([, keep], i) => (pairs[i][1] = imgLabel(keep)));
+  const sel = await askReview(
+    `같은 이미지 ${dups.length}장을 찾았어요. 지우지 않을 것은 체크를 풀어 주세요. 먼저 올린 쪽(→ 뒤)을 남기고, 지난 기록의 이미지는 남은 쪽으로 연결돼요.`,
+    pairs,
+  );
+  if (!sel || !sel.length) return;
+  const chosen = dups.filter((_, i) => sel.includes(pairs[i]));
   app.settings.dupMap = app.settings.dupMap || {};
+  const redirect = new Map(chosen.map(([d, keep]) => [d.id, keep.id]));
+  const final = id => {
+    let t = id;
+    for (let i = 0; i < 20 && redirect.has(t); i++) t = redirect.get(t);
+    return t;
+  };
   let done = 0;
-  for (const [d, keep] of dups) {
-    st.textContent = `${++done}/${dups.length} 정리 중`;
+  for (const [d] of chosen) {
+    say(`${++done}/${chosen.length} 정리 중`);
     try {
       await platform.assets.delete(d.id);
     } catch (e) {
@@ -1284,11 +1458,12 @@ async function dedupeImages() {
     await IMGDOC(d.id)
       .delete()
       .catch(e => noteIgnored('images-view: IMGDOC.delete', e));
-    app.settings.dupMap[d.id] = keep.id;
+    app.settings.dupMap[d.id] = final(d.id);
     app.images = app.images.filter(i => i.id !== d.id);
   }
+  for (const [a, b] of Object.entries(app.settings.dupMap)) if (redirect.has(b)) app.settings.dupMap[a] = final(b);
   await saveSettings();
-  st.textContent = '';
+  say('');
   toast(`${done}장 정리했어요`);
   renderImages();
 }

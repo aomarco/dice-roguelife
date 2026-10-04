@@ -54,12 +54,10 @@ export const IMGX = {
   doc(id) {
     return {
       set: async x => {
-        let p = IMGX.map.get(id);
-        if (p == null) {
-          p = IMGX.nextPage();
-          IMGX.map.set(id, p);
-        }
-        await IMGX.write(p, Object.assign({}, x, { id }));
+        const p = IMGX.assign(id);
+        // a picture already in the list is written through the page writer, so edits and uploads never overwrite each other
+        if (app.images.includes(x)) await IMGX.save(p);
+        else await IMGX.write(p, Object.assign({}, x, { id }));
       },
       delete: async () => {
         const p = IMGX.map.get(id);
@@ -69,15 +67,76 @@ export const IMGX = {
       },
     };
   },
+  // The page a picture belongs to, picked now (before anything is written).
+  assign(id) {
+    let p = this.map.get(id);
+    if (p == null) {
+      p = this.nextPage();
+      this.map.set(id, p);
+    }
+    return p;
+  },
+  // Pictures sent side by side each get their own page (a "lane"), so their list writes never wait for each other:
+  // lane 0 fills one page, lane 1 another, and so on. A lane moves to a free page when its page is full.
+  lanes: [],
+  laneAssign(id, lane) {
+    let p = this.map.get(id);
+    if (p != null) return p;
+    const counts = {};
+    for (const q of this.map.values()) counts[q] = (counts[q] || 0) + 1;
+    let cur = this.lanes[lane];
+    if (cur == null || (counts[cur] || 0) >= this.max) {
+      const taken = new Set(this.lanes.filter((q, i) => i !== lane && q != null));
+      let q = 0;
+      while ((counts[q] || 0) >= this.max || taken.has(q)) q++;
+      this.lanes[lane] = cur = q;
+    }
+    this.map.set(id, cur);
+    return cur;
+  },
+  // Write a page and wait until a write that includes the pictures in memory right now has finished. At most one write
+  // of a page is in flight; rows that land while it runs go out together in the next one, so a fast database is written
+  // almost every time and a slow one is written in bigger steps. Pages are separate documents and run side by side.
+  pending: new Map(),
+  save(p) {
+    let s = this.pending.get(p);
+    if (!s) {
+      s = { running: false, waiters: [] };
+      this.pending.set(p, s);
+    }
+    return new Promise((resolve, reject) => {
+      s.waiters.push({ resolve, reject });
+      if (!s.running) this.pump(p, s);
+    });
+  },
+  async pump(p, s) {
+    s.running = true;
+    while (s.waiters.length) {
+      const batch = s.waiters.splice(0); // the writers waiting now are covered by the write below
+      let err = null;
+      try {
+        await this.write(p);
+      } catch (e) {
+        err = e;
+      }
+      for (const w of batch) err ? w.reject(err) : w.resolve();
+    }
+    s.running = false;
+  },
   async flush(ids, onStat) {
-    // write every page that holds one of these ids, once
-    for (const id of ids) if (!this.map.has(id)) this.map.set(id, this.nextPage());
+    // write every page that holds one of these ids, once; different pages in parallel
+    for (const id of ids) this.assign(id);
     const ps = [...new Set(ids.map(id => this.map.get(id)))];
     let n = 0;
-    for (const p of ps) {
-      onStat && onStat(++n, ps.length);
-      await this.write(p);
-    }
+    const queue = [...ps];
+    const worker = async () => {
+      while (queue.length) {
+        const p = queue.shift();
+        onStat && onStat(++n, ps.length);
+        await this.save(p);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, ps.length) }, worker));
   },
   async clear() {
     const ps = [...new Set(this.map.values())];
