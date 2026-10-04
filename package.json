@@ -1,0 +1,27 @@
+{
+  "name": "dice-roguelife",
+  "version": "2.4.0",
+  "private": true,
+  "type": "module",
+  "description": "주사위가 정한 인생 (Dice Roguelife): dev tools only. The game is built from src/ into one HTML file; run `npm ci` once per checkout.",
+  "license": "MIT",
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24"
+  },
+  "scripts": {
+    "build": "node tools/build.js",
+    "lint": "node tools/release.js --check",
+    "format": "prettier --write src tools tests eslint.config.js playwright.config.js",
+    "test": "playwright test",
+    "release": "node tools/release.js"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0",
+    "esbuild": "0.28.2",
+    "eslint": "10.12.0",
+    "espree": "11.2.0",
+    "fflate": "0.8.3",
+    "globals": "17.13.0",
+    "prettier": "3.9.9"
+  }
+}

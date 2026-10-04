@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="theme-color" content="#000000" id="themeColor" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>주사위가 정한 인생</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <!-- build:styles -->
+  </head>
+  <body>
+    <div class="app">
+      <header class="top">
+        <div class="brand">
+          주사위가 정한 인생<small id="brandSub">Dice Roguelife, v<!-- build:version --></small>
+        </div>
+        <button class="btn ghost" id="gearBtn" type="button" aria-label="설정" style="padding: 6px 9px; order: 2">
+          ⚙
+        </button>
+        <nav class="tabs" aria-label="화면">
+          <button data-tab="play" aria-current="true">플레이</button>
+          <button data-tab="saves">저장</button>
+          <button data-tab="memory">기억</button>
+          <button data-tab="images">이미지</button>
+          <button data-tab="hall">전당</button>
+        </nav>
+      </header>
+      <main>
+        <section class="view on" id="v-play">
+          <div id="noSample" class="notice hidden">
+            이 화면에서는 Claude를 호출할 수 없어요. Claude에 로그인한 상태로 게시된 링크에서 열어 주세요. 그래도 안
+            되면 ⚙ → 진단 내용을 앱 주인에게 보내 주세요.
+          </div>
+          <div id="strip" class="strip hidden" role="button" tabindex="0" aria-label="상태창 열기"></div>
+          <div id="log" class="log"></div>
+          <div id="composer" class="composer hidden">
+            <div id="slash" class="slash hidden" role="listbox"></div>
+            <div id="inputHint" class="ihint hidden">
+              <span
+                >입력 요령: 말과 행동은 그대로 쓰고, 속마음이나 상황 설명만 <i>*별표*</i> 안에. 별표 안은 장면 속 누구도
+                듣지 못해요.</span
+              ><button type="button" aria-label="안내 닫기">×</button>
+            </div>
+            <form id="form">
+              <textarea
+                id="input"
+                rows="1"
+                placeholder="*상황설명*, *속마음*, 대사, 행동, /명령어"
+                aria-label="입력"
+              ></textarea>
+              <div class="sendcol">
+                <button class="btn primary" id="sendBtn" type="submit">보내기</button
+                ><label class="entertog" title="엔터 키로 보내기"
+                  ><input type="checkbox" id="enterTog" /> 엔터 전송</label
+                >
+              </div>
+            </form>
+          </div>
+        </section>
+        <section class="view" id="v-saves"><div class="pad" id="savesBox"></div></section>
+        <section class="view" id="v-memory"><div class="pad" id="memBox"></div></section>
+        <section class="view" id="v-images"><div class="pad" id="imgBox"></div></section>
+        <section class="view" id="v-hall"><div class="pad" id="hallBox"></div></section>
+      </main>
+    </div>
+    <div id="sheet" class="sheet hidden" role="dialog" aria-modal="true"><div class="inner" id="sheetInner"></div></div>
+
+    <!-- build:scripts -->
+  </body>
+</html>

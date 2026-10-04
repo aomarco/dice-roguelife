@@ -1,0 +1,370 @@
+/* ============ face picker: choose the portrait set for one person ============ */
+import { $, esc, noteIgnored, toast } from './util.js';
+import { normEmo } from './data.js';
+import { platform } from './db.js';
+import { turnStore } from './turn-store.js';
+import { app, isIdle } from './app.js';
+import { logErr } from './diag.js';
+import { closeSheet, openSheet } from './sheet.js';
+import { IMGX, SETDOC } from './library.js';
+import { charSets, charSetsAll, fitsWorld, genderOf, imgUrl, pickEmotion, setCover, turnPeople } from './images.js';
+import {
+  capTags,
+  castCandidates,
+  castFor,
+  castScorer,
+  isGeneric,
+  isIdTag,
+  presentOf,
+  speakerOf,
+  toEnglishTags,
+  wordSet,
+} from './casting.js';
+import { persist } from './persistence.js';
+import { renderLog } from './log.js';
+
+// The sheet behind a reply's face button. It shows the person's clues (looks and role the narrator gave), the tags of
+// the face they have now, and the sets that could replace it, best matches first. A pick applies to that reply and
+// to every later one. `p` below is one open picker:
+//   npc, t       the person and the reply the button was on
+//   cur, g, w    their current set, its gender, the world of this life
+//   why, clues   the clues kept for them (app.state.castWhy) and the same as one list
+//   sets, q      the usable character sets and the search text
+//   score        castScorer for these clues
+function openPicker(npc, ti) {
+  const cur = app.state.cast[npc];
+  const why = (app.state.castWhy || {})[npc] || { look: [], role: [] };
+  const p = {
+    npc,
+    t: app.turns.find(x => x.i === +ti),
+    cur,
+    g: cur ? genderOf(cur) : null,
+    w: app.state.life.world.id,
+    why,
+    clues: [...why.look, ...why.role],
+    sets: charSets(),
+    q: '',
+    score: null,
+  };
+  p.score = scorer(p);
+  return p;
+}
+function roleIn(p) {
+  const o = p.t && p.t.out;
+  if (!o) return '';
+  return (p.npc === o.speaker ? o.speaker_role : ((o.also_present || []).find(x => x.name === p.npc) || {}).role) || '';
+}
+function scorer(p) {
+  return castScorer({
+    name: p.npc,
+    gender: p.g,
+    role: roleIn(p),
+    weight: (app.state.castW || {})[p.npc] || 'minor',
+    look: p.clues,
+  });
+}
+const faceOf = (p, k) => setCover(k, p.sets[k] || []);
+const tagsOf = k => [...new Set((charSetsAll()[k] || []).flatMap(x => x.tags || []))];
+function hitsOf(p, k) {
+  const m = app.setMeta[k] || {};
+  const h = wordSet([k, m.role || '', ...(m.kw || []), ...tagsOf(k)]);
+  return p.clues.filter(w => h.has(w));
+}
+async function saveSetTags(k, fn) {
+  const imgs = charSetsAll()[k] || [];
+  for (const x of imgs) x.tags = capTags(fn(x.tags || []));
+  try {
+    await IMGX.flush(imgs.map(x => x.id));
+  } catch (e) {
+    toast('저장 실패: ' + (e.code || e.message));
+  }
+}
+
+/* ---- drawing ---- */
+function pickerHtml(p) {
+  const cf = p.cur && faceOf(p, p.cur);
+  return `<h3 class="fp-name">${esc(p.npc)}</h3><p class="muted sheet-lead">지금 얼굴: ${p.cur ? esc((app.setMeta[p.cur] || {}).charName || p.cur) : '없음'}. 고르면 이 턴과 앞으로의 턴에 적용돼요.</p>
+    ${cf ? `<img src="${imgUrl(cf.id)}" alt="" class="fp-cover">` : ''}
+    <div id="castWhy" class="fp-why"></div>
+    <div class="row fp-tools"><button class="btn" id="castAuto">자동으로 다시 고르기</button>${p.cur ? `<button class="btn ghost" id="castOff">이 세트 제외</button>` : ''}<button class="btn ghost" id="castNone">얼굴 없이</button></div>
+    <p class="muted fp-hint">단서와 맞는 얼굴이 앞에 와요(✓ 개수). 이름표가 붙은 얼굴은 다른 인물이 쓰는 중이라 고르면 맞바꾸고, ✝ 표시는 세상을 떠난 인물의 얼굴이라 쓸 수 없어요.</p>
+    <input id="castQ" placeholder="이름, 역할, 태그로 찾기" class="fp-search">
+    <div id="castGrid" class="fp-grid"></div>
+    <div class="row actions"><button class="btn" data-close>닫기</button></div>`;
+}
+// the clues, and the current face's tags (green where a clue meets one): a tag can be removed, or added by typing
+function drawWhy(p) {
+  const box = $('#castWhy');
+  if (!box) return;
+  const { cur, why, clues } = p;
+  const hits = cur ? hitsOf(p, cur) : [];
+  box.innerHTML = `${why.ai ? `<div class="muted fp-why-head">${why.none ? 'AI가 맞는 얼굴이 없다고 판단했어요. 태그를 보강하거나 직접 골라 주세요.' : 'AI가 후보 중에서 이 인물의 얼굴을 골랐어요.'}</div>` : ''}<div class="fp-why-words"><span class="muted">이 인물의 단서:</span> ${clues.length ? clues.map(w => `<b class="fp-word${hits.includes(w) ? ' hit' : ''}">${esc(w)}</b>`).join('') : '<span class="muted">없음 (예전 턴이거나 내레이터가 외형을 안 줬어요)</span>'}</div>
+      ${
+        cur
+          ? `<div class="fp-tags"><span class="muted">지금 얼굴의 태그 (맞은 건 초록):</span></div><div class="seg fp-tag-list">${tagsOf(
+              cur,
+            )
+              .map(
+                tag =>
+                  `<button type="button" data-rmtag="${esc(tag)}" class="fp-tag${clues.some(w => wordSet([tag]).has(w)) ? ' hit' : ''}">${esc(tag)} ✕</button>`,
+              )
+              .join('')}<input id="addTag" placeholder="+ 태그 (한국어는 영어로 바뀌어요)" class="fp-add-tag"></div>`
+          : ''
+      }`;
+  box.querySelectorAll('[data-rmtag]').forEach(
+    b =>
+      (b.onclick = async () => {
+        const tag = b.dataset.rmtag;
+        await saveSetTags(cur, a => a.filter(x => x !== tag));
+        drawWhy(p);
+        drawGrid(p);
+      }),
+  );
+  const add = $('#addTag');
+  if (add)
+    add.onkeydown = async e => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      e.preventDefault();
+      let tag = add.value.trim();
+      if (!tag) return;
+      add.disabled = true;
+      tag = (await toEnglishTags([tag]))[0];
+      await saveSetTags(cur, a => [...new Set([...a, tag])]);
+      drawWhy(p);
+      drawGrid(p);
+      const n = $('#addTag');
+      if (n) n.focus();
+    };
+}
+// up to 24 sets that fit the world and the gender (and the search), most clue matches first. Sets labeled other
+// (기타) are offered to anyone here: the player choosing by hand may want a beast's face that casting never gives
+function drawGrid(p) {
+  const { npc, cur, g, w, sets, q } = p;
+  const cands = Object.keys(sets)
+    .filter(
+      k =>
+        k !== cur &&
+        fitsWorld(app.setMeta[k] || {}, w) &&
+        (!g || !genderOf(k) || genderOf(k) === g || (app.setMeta[k] || {}).gender === 'other'),
+    )
+    .filter(k => {
+      if (!q) return true;
+      const m = app.setMeta[k] || {};
+      return [k, m.charName, m.role, ...(sets[k] || []).flatMap(x => x.tags || [])]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+        .includes(q);
+    })
+    .sort((a, b) => hitsOf(p, b).length - hitsOf(p, a).length || p.score(b) - p.score(a))
+    .slice(0, 24);
+  const owner = k => Object.keys(app.state.cast).find(n => n !== npc && app.state.cast[n] === k);
+  const retired = k => {
+    const o = owner(k);
+    return o && app.state.deadNpc && app.state.deadNpc[o] && !isGeneric(k) ? o : null;
+  };
+  $('#castGrid').innerHTML =
+    cands
+      .map(k => {
+        const f = faceOf(p, k);
+        const m = app.setMeta[k] || {};
+        const o = owner(k);
+        const rt = retired(k);
+        const hits = hitsOf(p, k).length;
+        return `<button type="button" data-pick="${esc(k)}" ${rt ? 'disabled title="이 삶에서 세상을 떠난 인물의 얼굴이라 다시 쓸 수 없어요"' : ''} class="fp-cell"><img src="${imgUrl(f.id)}" loading="lazy" alt="" class="fp-thumb${o ? ' taken' : ''}">${o ? `<span class="fp-badge">${rt ? '✝ ' : ''}${esc(o)}</span>` : ''}<span class="fp-label">${esc(m.charName || k)}${hits ? ` <b class="fp-hits">✓${hits}</b>` : ''}</span></button>`;
+      })
+      .join('') || '<p class="muted empty">맞는 세트가 없어요.</p>';
+  $('#castGrid')
+    .querySelectorAll('[data-pick]:not([disabled])')
+    .forEach(b => (b.onclick = () => applyFace(p, b.dataset.pick)));
+}
+
+/* ---- changes ---- */
+// k: the set to give the person, or null for none. A face another person holds is swapped, so nobody gets a twin.
+async function applyFace(p, k) {
+  const { npc, cur, t } = p;
+  app.state.noFace = (app.state.noFace || []).filter(n => n !== npc);
+  const other = k && Object.keys(app.state.cast).find(n => n !== npc && app.state.cast[n] === k);
+  if (other) {
+    if (cur) app.state.cast[other] = cur;
+    else delete app.state.cast[other];
+    toast(`${other}와(과) 얼굴을 맞바꿨어요`);
+  }
+  if (k) app.state.cast[npc] = k;
+  else delete app.state.cast[npc];
+  if (t && t.img) {
+    const o = t.out || {};
+    const main = npc === o.speaker;
+    const ap = (o.also_present || []).find(x => x.name === npc) || {};
+    const kk = k || castFor(main ? { ...speakerOf(o), name: npc } : presentOf({ ...ap, name: npc }));
+    const im = kk ? pickEmotion(kk, normEmo(main ? o.emotion : ap.emotion), main ? o.speaker_look : []) : null;
+    if (!Array.isArray(t.img.chars)) t.img.chars = t.img.char ? [{ id: t.img.char, npc: o.speaker || '' }] : [];
+    const e = t.img.chars.find(c => c.npc === npc);
+    if (e) {
+      if (im) e.id = im.id;
+      else t.img.chars = t.img.chars.filter(c => c !== e);
+    } else if (im) t.img.chars.push({ id: im.id, npc });
+    if (main) t.img.char = im ? im.id : null;
+    try {
+      await turnStore.update(t);
+    } catch (e) {
+      noteIgnored('face change: save the turn', e);
+    }
+  }
+  await persist();
+  closeSheet();
+  renderLog('keep');
+  if (!other) toast(`${npc}의 얼굴을 바꿨어요`);
+}
+// the person as the reply on this button describes them: the speaker, or one of the others present
+function personIn(p) {
+  const o = (p.t && p.t.out) || {};
+  const ap = (o.also_present || []).find(x => x.name === p.npc);
+  return p.npc === o.speaker || !ap ? { ...speakerOf(o), name: p.npc } : presentOf({ ...ap, name: p.npc });
+}
+// a new automatic pick, never the same set again unless it is the only one: the best other candidate, under the same
+// rules as any automatic pick (world, gender, faces others wear)
+async function pickAgain(p) {
+  const { npc, cur } = p;
+  const person = personIn(p);
+  delete app.state.cast[npc];
+  let k = castFor(person);
+  if (k === cur) {
+    delete app.state.cast[npc];
+    k = castCandidates(person, 40).find(x => x !== cur) || cur;
+  }
+  await applyFace(p, k);
+}
+// the current set is never assigned again (its set card is marked off), and the person gets a new automatic pick
+async function retireSet(p) {
+  const { npc, cur } = p;
+  const m = (app.setMeta[cur] = app.setMeta[cur] || {});
+  m.off = true;
+  try {
+    await SETDOC(cur).set(m);
+  } catch (e) {
+    noteIgnored('face retire: save the set card', e);
+  }
+  delete app.state.cast[npc];
+  await applyFace(p, castFor(personIn(p)));
+  toast(`${cur}: 앞으로 배정되지 않아요`);
+}
+// this person shows no face from now on
+async function noFace(p) {
+  const { npc, t } = p;
+  delete app.state.cast[npc];
+  app.state.noFace = [...new Set([...(app.state.noFace || []), npc])];
+  if (t && t.img) {
+    if (Array.isArray(t.img.chars)) t.img.chars = t.img.chars.filter(c => c.npc !== npc);
+    if ((t.out || {}).speaker === npc) t.img.char = null;
+    try {
+      await turnStore.update(t);
+    } catch (e) {
+      noteIgnored('face retire: save the turn', e);
+    }
+  }
+  await persist();
+  closeSheet();
+  renderLog('keep');
+}
+// clues the narrator wrote in Korean cannot meet English tags: turn them into English once (vocabulary-aware), keep
+// the identity tags as they are
+async function translateClues(p) {
+  try {
+    const src = p.clues.filter(w => !isIdTag(w));
+    const en = await toEnglishTags(src);
+    if (!en || en.length !== src.length) return;
+    const map = new Map(
+      src.map((w, i) => [
+        w,
+        String(en[i] || w)
+          .toLowerCase()
+          .trim(),
+      ]),
+    );
+    const fix = a => [...new Set(a.map(w => (isIdTag(w) ? w : map.get(w) || w)))];
+    p.why.look = fix(p.why.look || []);
+    p.why.role = fix(p.why.role || []);
+    p.clues = [...p.why.look, ...p.why.role];
+    app.state.castWhy = app.state.castWhy || {};
+    app.state.castWhy[p.npc] = p.why;
+    p.score = scorer(p);
+    await persist();
+    if ($('#castGrid')) {
+      drawGrid(p);
+      drawWhy(p);
+    }
+  } catch (e) {
+    logErr('clues', e);
+  }
+}
+
+// the face button on a turn: with one person on screen it opens the face window, with several it asks whose first
+export function changeFaceIn(ti) {
+  try {
+    if (!isIdle()) {
+      toast('답을 쓰는 중이에요. 끝나면 바꿀 수 있어요');
+      return;
+    }
+    const t = app.turns.find(x => x.i === ti);
+    if (!t) {
+      toast('이 턴을 찾지 못했어요. 새로고침 후 다시 눌러 주세요');
+      return;
+    }
+    const names = turnPeople(t.img || {}, t.out || {})
+      .map(p => p.npc)
+      .filter(Boolean);
+    if (!names.length) {
+      toast('이 장면엔 바꿀 수 있는 얼굴이 없어요');
+      return;
+    }
+    if (names.length <= 1) {
+      openCast(names[0], t.i);
+      return;
+    }
+    openSheet(
+      `<h3 class="sheet-title">누구의 얼굴을 바꿀까요?</h3><div class="choices">${names.map(n => `<button data-who="${esc(n)}">${esc(n)}</button>`).join('')}</div><div class="row who-actions"><button class="btn" data-close>닫기</button></div>`,
+    );
+    $('#sheetInner')
+      .querySelectorAll('[data-who]')
+      .forEach(
+        x =>
+          (x.onclick = () => {
+            try {
+              closeSheet();
+              openCast(x.dataset.who, t.i);
+            } catch (e) {
+              logErr('face', e);
+              toast('얼굴 고르기 창을 여는 중 문제가 생겼어요');
+            }
+          }),
+      );
+  } catch (e) {
+    logErr('face', e);
+    toast('얼굴 고르기 창을 여는 중 문제가 생겼어요');
+  }
+}
+export let openCast = async function openCast(npc, ti) {
+  const p = openPicker(npc, ti);
+  openSheet(pickerHtml(p));
+  drawGrid(p);
+  drawWhy(p);
+  if (platform.sample && p.clues.some(w => /[^\x00-\x7F]/.test(w) && !isIdTag(w))) translateClues(p);
+  let qt = null;
+  $('#castQ').oninput = e => {
+    clearTimeout(qt);
+    qt = setTimeout(() => {
+      p.q = e.target.value.trim().toLowerCase();
+      drawGrid(p);
+    }, 200);
+  };
+  $('#castAuto').onclick = () => pickAgain(p);
+  const off = $('#castOff');
+  if (off) off.onclick = () => retireSet(p);
+  $('#castNone').onclick = () => noFace(p);
+};
+
+// the functions above that tests may replace (window.DR.mock): each setter swaps the binding every caller uses
+export const mocks = {
+  openCast: f => (openCast = f),
+};
