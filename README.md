@@ -48,27 +48,7 @@ https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-r
 
 저장 데이터는 아티팩트 링크에 묶여 있어요. **새 아티팩트를 만들면 저장이 빈 채로 시작**하니, 꼭 쓰던 링크에 덮어쓰세요. 업데이트하면 화면이 새로고침되니 쓰던 입력은 먼저 보내 두세요.
 
-```
-아래 링크의 최신 버전 dice-roguelife.html 파일을 받아서, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
-db, sample, user, assets, downloads 기능이 모두 필요해.
-https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
-내 아티팩트: (여기에 내 아티팩트 링크)
-```
-
-### 막혔을 때
-
-- **"GitHub가 자동 접근을 막았다"고 하거나 파일을 받지 못했다고 하면**: 웹 읽기로 받으려 한 거예요. 아래 문구로 다시 보내세요. 컴퓨터 도구(bash)로 받게 하는 문구예요.
-
-설치:
-
-```
-컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마. GitHub가 막아서 실패해.
-curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
-받은 파일이 수백 KB짜리 HTML인지(오류 문구가 아닌지) 확인한 다음,
-db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.
-```
-
-업데이트:
+게임 안 ⚙ 설정 → **업데이트 확인**에서 아래 문구를 만들어 줘요(링크를 넣으면 자동으로 채워져요). 직접 쓰셔도 돼요. 맨 아래 줄의 링크만 쓰던 아티팩트 주소로 바꿔 주세요.
 
 ```
 컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마.
@@ -76,6 +56,17 @@ curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/
 받은 파일이 수백 KB짜리 HTML인지 확인한 다음, 새 아티팩트를 만들지 말고 아래 내 아티팩트 링크에 덮어써 줘.
 기능은 db, sample, user, assets, downloads, artifact로 맞춰 줘.
 내 아티팩트: (여기에 내 아티팩트 링크)
+```
+
+### 막혔을 때
+
+- **"GitHub가 자동 접근을 막았다"고 하거나 파일을 받지 못했다고 하면**: 웹 읽기로 받으려 한 거예요. 아래 문구로 다시 보내세요. 컴퓨터 도구(bash)로 받게 하는 문구예요.
+
+```
+컴퓨터 도구(bash)에서 아래 명령으로 파일을 받아 줘. 웹 읽기(web fetch)는 쓰지 마. GitHub가 막아서 실패해.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+받은 파일이 수백 KB짜리 HTML인지(오류 문구가 아닌지) 확인한 다음,
+db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.
 ```
 
 - **`403 host_not_allowed` / `Host not in allowlist: github.com`**: 네트워크 허용이 꺼져 있거나, 켜기 전에 시작한 대화예요. 설정을 확인하고 **새 대화**에서 다시 해 보세요.

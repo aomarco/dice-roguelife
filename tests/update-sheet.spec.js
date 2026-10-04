@@ -1,4 +1,4 @@
-// the version comes from package.json, and the update sheet hands over a request that names the repo and this artifact
+// the version comes from package.json, and the update sheet hands over a request that fetches the release with curl and names this artifact
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,8 +19,8 @@ test('update sheet', async ({ game }) => {
   const text = await pg.inputValue('#updText');
   console.log('request:', text.replaceAll('\n', ' / '));
   for (const want of [
-    `v${VERSION}`,
-    'https://github.com/wonjoonSeol-WS/dice-roguelife',
+    '컴퓨터 도구(bash)',
+    'curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html',
     '덮어써',
     '(여기에 내 아티팩트 링크)',
   ]) {
