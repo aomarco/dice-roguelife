@@ -11,6 +11,23 @@
 - 캐릭터 초상화와 배경을 직접 올려 장면에 붙이는 이미지 라이브러리
 - 인생 결산과 전당, 이야기 내보내기(Markdown, HTML), 저장 파일 내보내기와 가져오기
 
+## 설치 (비개발자용)
+
+1. [claude.ai](https://claude.ai)에서 새 대화를 열어요.
+2. 아래 문구를 **그대로 복사해서 붙여넣어요.**
+
+```
+아래 링크의 최신 버전 dice-roguelife.html 파일을 받아서, 내 아티팩트로 게시해 줘.
+db, sample, user, assets, downloads 기능이 모두 필요해.
+https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+```
+
+3. Claude가 만들어 준 링크를 **즐겨찾기에 저장**하고, 그 링크에서 플레이해요.
+
+- 링크를 받을 수 없다고 하면 [Releases](https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest)에서 `dice-roguelife.html`을 내려받아 대화에 첨부하고 같은 문구를 보내요.
+- 저장은 그 링크에 묶여요. 나중에 새 버전으로 바꿀 때도 **새 아티팩트를 만들지 말고 같은 링크에 덮어써요.** 방법은 아래 [업데이트 방법](#업데이트-방법)이에요.
+- 화면과 사용법은 [가이드 사이트](https://wonjoonseol-ws.github.io/dice-roguelife/)에서 볼 수 있어요.
+
 ## 실행 환경
 
 **claude.ai 아티팩트 전용입니다.** 일반 웹사이트로 열면 Claude를 호출할 수 없어서 게임이 시작되지 않습니다. 페이지는
@@ -28,7 +45,7 @@
 이미지 탭에서 아티팩트마다 직접 올립니다. 파일 이름이 `female3_smile.png`(세트_표정)나 `bg_tavern_night.png` 꼴이면
 종류와 세트를 알아서 분류합니다.
 
-## 내 아티팩트로 띄우기
+## 내 아티팩트로 띄우기 (직접 빌드하는 개발자용)
 
 1. 페이지를 빌드합니다. Node.js가 필요합니다(아래 "개발").
    ```
