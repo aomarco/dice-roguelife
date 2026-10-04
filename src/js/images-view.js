@@ -983,19 +983,22 @@ export async function importTags(file) {
           .split(',')
           .map(t => t.trim())
           .filter(Boolean);
-  const setEntries = Object.entries(j.sets || {}),
+  // only sets that have pictures here are used; a set in the file with no pictures uploaded is ignored (it would only
+  // leave an empty set card behind and use up a database document)
+  const allSets = Object.entries(j.sets || {}),
+    setEntries = allSets.filter(([k]) => charSetsAll()[k]),
     setTagsIn = {};
   const replaceTags = j.merge_tags !== true; // the file's tags win; "merge_tags": true keeps the old ones too
   const imgHit = Object.keys(j.images || {}).filter(fn => findImg(fn)).length,
     bgHit = Object.keys(j.backgrounds || {}).filter(fn => findImg(fn)).length,
-    setHit = setEntries.filter(([k]) => charSetsAll()[k]).length;
+    setHit = setEntries.length;
   if (!imgHit && !bgHit && !setHit) {
     toast('파일 이름이나 세트 이름이 목록과 하나도 맞지 않아요');
     return;
   }
   if (
     !(await askConfirm(
-      `세트 ${setHit}/${setEntries.length}개, 이미지 ${imgHit}/${Object.keys(j.images || {}).length}장, 배경 ${bgHit}/${Object.keys(j.backgrounds || {}).length}장에 적용해요.\n이미지 태그는 ${replaceTags ? '파일의 태그로 교체돼요 (기존 태그 삭제)' : '기존 태그와 합쳐져요 (merge_tags)'}. 진행할까요?`,
+      `세트 ${setHit}/${allSets.length}개, 이미지 ${imgHit}/${Object.keys(j.images || {}).length}장, 배경 ${bgHit}/${Object.keys(j.backgrounds || {}).length}장에 적용해요.\n이미지 태그는 ${replaceTags ? '파일의 태그로 교체돼요 (기존 태그 삭제)' : '기존 태그와 합쳐져요 (merge_tags)'}. 진행할까요?`,
     ))
   )
     return;
