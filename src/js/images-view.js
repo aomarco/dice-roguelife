@@ -495,6 +495,7 @@ async function compress(file) {
     const portrait = bmp.height > bmp.width * 1.1;
     const max = portrait ? 1100 : 1400;
     const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    if (k === 1 && file.type === 'image/webp') return { blob: file, portrait }; // already stored size: keep the bytes (no second compression)
     const cv = document.createElement('canvas');
     cv.width = Math.round(bmp.width * k);
     cv.height = Math.round(bmp.height * k);
@@ -622,7 +623,8 @@ async function uploadFiles(files) {
     st.textContent = `${++n}/${files.length} 올리는 중${skipped ? `, 건너뜀 ${skipped}` : ''}${failed.length ? `, 실패 ${failed.length}` : ''}${el > 5 ? `, 약 ${el >= 60 ? Math.round(el / 60) + '분' : el + '초'} 남음` : ''}`;
     try {
       const hash = await sha256Hex(f).catch(() => null);
-      if (app.images.some(x => (hash && x.hash === hash) || x.file === f.name)) {
+      // an exported pack holds the stored (already compressed) files under new names: they match by the stored file hash
+      if (app.images.some(x => (hash && (x.hash === hash || x.shash === hash)) || x.file === f.name)) {
         skipped++;
         continue;
       }
