@@ -25,7 +25,7 @@
 
 ### 준비 (처음 한 번만)
 
-1. **폰 브라우저**(앱 말고)로 claude.ai에 로그인 → 설정 → 기능(Capabilities)
+1. **폰 브라우저**(앱 말고)로 [claude.ai 설정 → 기능(Capabilities)](https://claude.ai/settings/capabilities)을 열어요. 로그인이 안 되어 있으면 먼저 로그인하세요.
 2. **코드 실행 및 파일 생성** 켜기
 3. **네트워크 허용(Allow network egress)** 켜기
    - 이 항목은 **앱 설정에는 없어요.** 브라우저에서 켜야 해요. 한 번 켜면 앱에도 그대로 적용돼요.
