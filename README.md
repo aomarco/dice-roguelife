@@ -25,10 +25,13 @@
 
 ### 준비 (처음 한 번만)
 
-1. Claude 앱 설정 → 기능(Capabilities)
+1. **폰 브라우저**(앱 말고)로 claude.ai에 로그인 → 설정 → 기능(Capabilities)
 2. **코드 실행 및 파일 생성** 켜기
 3. **네트워크 허용(Allow network egress)** 켜기
-4. 설정을 바꿨다면 **새 대화**를 열어서 진행하세요. 이미 열려 있던 대화에는 바뀐 설정이 적용되지 않아요.
+   - 이 항목은 **앱 설정에는 없어요.** 브라우저에서 켜야 해요. 한 번 켜면 앱에도 그대로 적용돼요.
+   - 계정에 따라 기본으로 꺼져 있어요.
+4. 앱으로 돌아와 **새 대화**를 열어서 진행하세요. 이미 열려 있던 대화에는 바뀐 설정이 적용되지 않아요.
+5. 새 대화에서도 막히면 **설정이 반영되기까지 몇 분** 걸릴 수 있어요. 5분쯤 뒤에 다시 시도하세요.
 
 ![Claude 설정 → 기능(Capabilities): 코드 실행 및 파일 생성과 네트워크 허용(Allow network egress)을 켜요](docs/images/egress-setting.png)
 
@@ -42,7 +45,7 @@ db, sample, user, assets, downloads 기능이 모두 필요해.
 https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
 ```
 
-게시된 링크를 열면 바로 플레이할 수 있어요. 처음엔 Claude 호출 동의 창이 떠요.
+게시된 링크를 열면 바로 플레이할 수 있어요. 처음 실행할 때 **Claude 연결 확인 창**이 떠요. **확인(OK)을 눌러야** 게임이 Claude를 불러 이야기를 쓸 수 있어요.
 
 ### 업데이트
 
@@ -69,7 +72,7 @@ curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/
 db, sample, user, assets, downloads, artifact 기능을 켜서 그대로 내 아티팩트로 게시해 줘.
 ```
 
-- **`403 host_not_allowed` / `Host not in allowlist: github.com`**: 네트워크 허용이 꺼져 있거나, 켜기 전에 시작한 대화예요. 설정을 확인하고 **새 대화**에서 다시 해 보세요.
+- **`403 host_not_allowed` / `Host not in allowlist: github.com`**: 네트워크 허용이 꺼져 있거나, 켜기 전에 시작한 대화예요. 브라우저에서 설정을 확인하고 **새 대화**에서 다시 해 보세요. 켠 직후라면 반영에 몇 분 걸릴 수 있으니 **5분 뒤 재시도**해 보세요.
 - **새 대화에서도 막힘**: 회사나 학교 계정이면 관리자가 네트워크를 막아 뒀을 수 있어요. 직접 고른 도메인만 허용하는 설정이라면 `github.com`과 `release-assets.githubusercontent.com`을 추가해 주세요.
 - **그래도 안 되면**: 브라우저로 위 링크를 열어 `dice-roguelife.html`을 받은 뒤, 채팅에 파일을 첨부하고 "이 파일을 db, sample, user, assets, downloads 기능을 켜서 내 아티팩트로 게시해 줘"라고 보내세요.
 
