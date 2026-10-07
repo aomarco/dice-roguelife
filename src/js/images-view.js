@@ -54,7 +54,7 @@ function imagesHeaderHtml(usage, orphan, canAuto) {
    ${orphan > 0 ? `<div class="notice img-notice">${T('Storage holds {files} images but the list has only {listed}.', { files: usage.files, listed: app.images.length })} <button class="btn inline-action" id="recover">${T('Recover the list')}</button></div>` : ''}
    <details class="odds guide img-guide"><summary>${T('Help: tags and file names')}</summary>
       <p>${T('<b>There are two kinds of tags</b>, with one rule: proper nouns stay in their own language, everything else is English.')}</p>
-      <div class="g"><code>${T('Looks')}</code><span>${T('English. <code>black hair</code>, <code>armor</code>. The narrator describes looks in English and the code compares word by word. Korean is turned into English when saved; English only gets its spelling fixed.')}</span><code>${T('Identity')}</code><span>${T('<code>key:value</code>. The key is English (<code>faction</code>, <code>company</code>, any word), the value is a proper noun in its own language (<code>faction:사천당가</code>, <code>company:넥슨</code>). It is compared as is, never translated. It must be on every frame of a set, so add it on the set card; "Find faction tags" pulls them from descriptions.')}</span></div>
+      <div class="g"><code>${T('Looks')}</code><span>${T('English. <code>black hair</code>, <code>armor</code>. The narrator describes looks in English and the code compares word by word. Korean is turned into English when saved; English only gets its spelling fixed.')}</span><code>${T('Identity')}</code><span>${T('<code>key:value</code>. The key is English (<code>faction</code>, <code>company</code>, any word), the value is a proper noun in its own language (<code>faction:Tang Clan</code>, <code>company:Nintendo</code>). It is compared as is, never translated. It must be on every frame of a set, so add it on the set card; "Find faction tags" pulls them from descriptions.')}</span></div>
       <p>${T("<b>File name rules</b> (you'll be asked when a name doesn't fit)")}</p>
       <div class="g"><code>{set}_{emotion}</code><span>${T('Character. <code>female1_smile.png</code>. A set is one person with several expressions.')}</span><code>shadow_{gender}</code><span>${T('Silhouette for extras. <code>shadow_male_neutral.png</code>, <code>shadow_female_2.png</code>. Grouped into a set per gender')}</span><code>bg_{place}_{time}</code><span>${T('Background. <code>bg_tavern_night.png</code>')}</span><code>admin_{emotion}</code><span>${T('Game master')}</span><code>dice</code><span>${T('Dice effect. <code>dice</code>, <code>dice_success</code>, <code>dice_fail</code>. Needs no labels and auto-sort skips it')}</span></div>
       <p>${T('Uploading the same file again skips it.')}</p>
@@ -140,7 +140,7 @@ function setCardHtml(k, imgs) {
              `<button type="button" data-stag="${esc(t)}" aria-pressed="true" title="${isIdTag(t) ? T('Identity tag: compared as is, never translated') : T('Looks tag: English, compared word by word')}" class="chip-sm set-tag${isIdTag(t) ? ' id' : ''}">${esc(t)} ✕</button>`,
          )
          .join('');
-     })()}<input data-stagadd placeholder="${T('Add a tag (an affiliation like faction:사천당가)')}" class="set-tag-input"></div></div>`;
+     })()}<input data-stagadd placeholder="${T('Add a tag (an affiliation like faction:Tang Clan)')}" class="set-tag-input"></div></div>`;
 }
 
 function allImagesSectionHtml() {

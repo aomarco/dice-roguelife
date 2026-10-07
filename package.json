@@ -1,6 +1,6 @@
 {
   "name": "dice-roguelife",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "private": true,
   "type": "module",
   "description": "주사위가 정한 인생 (Dice Roguelife): dev tools only. The game is built from src/ into one HTML file; run `npm ci` once per checkout.",
@@ -22,6 +22,7 @@
     "espree": "11.2.0",
     "fflate": "0.8.3",
     "globals": "17.13.0",
-    "prettier": "3.9.9"
+    "prettier": "3.9.9",
+    "upng-js": "^2.1.0"
   }
 }

@@ -152,7 +152,7 @@ practice; you may need a pricier plan to use more.
 - The more you send, the better it remembers the story.
 - It also uses up your subscription faster. If you hit the limit often, lower it.
 
-![Recent memory size setting](docs/images/context-size-ko.png)
+![Recent memory size setting](docs/images/context-size-en.png)
 
 ## Design decision: why ship as an artifact
 
@@ -189,8 +189,8 @@ Ship it as a single claude.ai artifact. The artifact provides Claude calls (`sam
 | Anthropic sets the usage limits | I can't change them. Sending less recent story helps. |
 | It depends on one host (Claude) | See Extensibility below. |
 
-![Exporting and deleting saves](docs/images/saves-export-ko.png)
-![When storage is full](docs/images/quota-full-ko.png)
+![Exporting and deleting saves](docs/images/saves-export-en.png)
+![When storage is full](docs/images/quota-full-en.png)
 
 ### Extensibility
 

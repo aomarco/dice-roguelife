@@ -14,7 +14,14 @@ export const SETTING_DEFAULTS = {
   growth: 'auto', // how generous stat growth is
   questStyle: 'board',
   newsStyle: 'broadcast',
+  boardStyle: 'auto',
+  chatStyle: 'auto',
   gamblerP: 0.15, // the chance of a jackpot, and of a doom, each turn with the gambler's stone
+};
+// 'auto' looks like what players of the story's language know
+const AUTO_STYLE = {
+  boardStyle: { ko: 'dc', en: 'reddit', ja: '5ch' },
+  chatStyle: { ko: 'kakao', en: 'whatsapp', ja: 'line' },
 };
 
 let writes = Promise.resolve();
@@ -26,6 +33,10 @@ export function setting(key) {
 // the narrator's language; defaults to the screen's
 export function storyLang() {
   return app.settings.lang || uiLang();
+}
+export function widgetStyle(key) {
+  const v = setting(key);
+  return v !== 'auto' ? v : AUTO_STYLE[key][storyLang()] || AUTO_STYLE[key].en;
 }
 // a Japanese story reads the English prompt and is told to answer in Japanese (prompts.json "lang")
 export function promptLang() {

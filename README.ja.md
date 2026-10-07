@@ -151,7 +151,7 @@ Claudeの20ドルプラン（定額）とCrackの呼び出しごとの料金を�
 - 多く送るほど、物語をよく覚えています。
 - そのぶんサブスクリプションの消費も早くなります。上限によく達するなら減らしてください。
 
-![最近の記憶の量の設定](docs/images/context-size-ko.png)
+![最近の記憶の量の設定](docs/images/context-size-ja.png)
 
 ## 設計判断：なぜアーティファクトで配布するのか
 
@@ -187,8 +187,8 @@ claude.ai のアーティファクト1つとして配布します。アーティ
 | 利用上限はAnthropicが決める | 私には変えられません。最近の物語を送る量を減らすと楽になります。 |
 | ひとつのホスト（Claude）に依存する | 下の「拡張性」を参照。 |
 
-![セーブの書き出しと削除](docs/images/saves-export-ko.png)
-![保存容量がいっぱいになったとき](docs/images/quota-full-ko.png)
+![セーブの書き出しと削除](docs/images/saves-export-ja.png)
+![保存容量がいっぱいになったとき](docs/images/quota-full-ja.png)
 
 ### 拡張性
 

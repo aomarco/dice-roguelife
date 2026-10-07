@@ -27,6 +27,7 @@
 | `tools/comment-scan.js` | `//` 주석이 코드를 삼킨 흔적 찾기 |
 | `tools/i18n-check.js` | 번역 검사: 한국어가 없는 키, 코드에 남은 한국어 (`npm run lint`에 포함) |
 | `tools/shot-sys-lines.js` | 시스템 줄 배치를 눈으로 확인할 스크린샷 (테스트 아님) |
+| `tools/shots.js` | 가이드 사이트 스크린샷: `node tools/shots.js en` → `docs/images/<이름>-en.png`. 장면 속 이야기는 `tools/shots/<언어>.json`의 가짜 텍스트, 얼굴은 그려 넣은 임시 그림 (`DR_SHOT_ART`로 실제 그림). 화면이 바뀌었을 때만 다시 찍어요 |
 | `tests/` | Playwright 테스트(`*.spec.js`, 설정은 `playwright.config.js`). `support/test.js`(페이지를 여는 `game` 픽스처), `support/harness.js`(목 DB, 가짜 Claude, 새 삶 시작, `check`), `support/global-setup.js`(한 번 빌드), `support/dbmock.js`, `fixtures/library.json`(축소한 실제 이미지 목록). 페이지 안은 `window.DR`로 들여다봅니다. |
 
 ### 모듈 규칙
@@ -68,7 +69,7 @@
 | `images.js` | 이미지 찾기: `imgById`, 캐릭터 세트(`charSets`), 세계 맞춤(`fitsWorld`, `setWorlds`), 표정 고르기(`pickEmotion`), 장면 HTML |
 | `places.js` | 배경 검색: 내레이터가 영어 단어로 묘사한 장소 → 배경 이미지(`findPlace`) |
 | `casting.js` | 캐스팅: 인물(`{ name, gender, role, weight, look }`, 답에서는 `speakerOf`, `presentOf`)에게 초상화 세트 배정(외모, 역할, 소속 태그 점수), AI 선택, 그림자. 성별이 있는 인물에게는 `기타` 세트를 자동으로 주지 않습니다(얼굴 고르기 창에서는 고를 수 있음). |
-| `widgets.js` | 위젯 레지스트리 `WIDGETS`: 뉴스, 의뢰 게시판, 커뮤니티, 메신저마다 렌더, 접기 라벨, 후속 버튼, 마크다운 내보내기. 새 위젯은 항목 하나와 `prompts.json`의 스키마로 추가합니다. |
+| `widgets.js` | 위젯 레지스트리 `WIDGETS`: 뉴스, 의뢰 게시판, 커뮤니티, 메신저마다 렌더, 접기 라벨, 후속 버튼, 마크다운 내보내기. 새 위젯은 항목 하나와 `prompts.json`의 스키마로 추가합니다. 게시판과 메신저는 생김새가 여럿(`BOARDS`: DC, 레딧, 5ch, 니코니코 / `CHATS`: 카카오톡, 왓츠앱, 라인)이고 데이터는 같아요. 설정 `boardStyle`, `chatStyle`, 자동이면 이야기 언어로 (`settings.js` `widgetStyle`). |
 | **답과 프롬프트** | |
 | `apply.js` | 답 반영(`applyOut`): 단계별 함수(`APPLY_STEPS`)가 공유 맥락 `ctx`를 받아 스탯, 아이템, 스킬, 기억, 시간, 장면과 초상화를 차례로 바꿉니다 |
 | `prompt.js` | 프롬프트 조립(`buildPrompt`), 내레이터 호출(`callNarrator`), 스트리밍 중 필드 읽기(`peekReply`), JSON 복구, `normalize` |

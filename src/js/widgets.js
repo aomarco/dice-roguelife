@@ -8,9 +8,9 @@
 import { esc } from './util.js';
 import { mentionsStars } from './reply-words.js';
 import { app } from './app.js';
-import { setting } from './settings.js';
+import { setting, widgetStyle } from './settings.js';
 import { cmdName } from './data.js';
-import { N_, T, Tc } from './i18n.js';
+import { locale, N_, T, Tc } from './i18n.js';
 
 function stars(n) {
   n = Math.max(0, Math.min(5, Math.round(n || 0)));
@@ -49,11 +49,26 @@ function questHtml(w, ti) {
       })
       .join('')}</div></div>`;
 }
-function galleryHtml(w) {
-  const p = w.post;
-  const anon = T('Anon');
+// Boards and messengers come in the looks players know (settings boardStyle, chatStyle); the widget data is the same.
+const short = n => new Intl.NumberFormat(locale(), { notation: 'compact', maximumFractionDigits: 1 }).format(n || 0);
+const first = s => Array.from(String(s || '?').trim())[0] || '?';
+// a stable small number per name: a 5ch poster ID, an avatar's color
+const hash = s => [...String(s)].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 7);
+const ID_CH = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+const posterId = s => {
+  let h = hash(s);
+  return Array.from({ length: 8 }, () => ID_CH[(h = (Math.imul(h, 1103515245) + 12345) >>> 0) % 62]).join('');
+};
+const avatar = name =>
+  `<span class="av" style="background:hsl(${hash(name) % 360} 45% 52%)">${esc(first(name))}</span>`;
+const postList = (w, item) =>
+  w.posts && w.posts.length
+    ? `<ul>${w.posts.map((x, i) => `<li><button data-open="${esc(x.title)}">${item(x, i)}</button></li>`).join('')}</ul>`
+    : '';
+
+function dcHtml(w, p, anon) {
   return `<div class="w w-gal"><div class="gh"><small>${esc(w.site || T('Community'))}</small><div>${esc(w.board || T('Board'))}</div></div>
-    ${w.posts && w.posts.length ? `<ul>${w.posts.map(x => `<li><button data-open="${esc(x.title)}"><div class="t">${esc(x.title)} <span class="muted">[${esc(x.comments ?? 0)}]</span></div><div class="m">${esc(x.author || anon)} | ${esc(T('Views {n}', { n: x.views ?? 0 }))} | ${esc(T('Likes {n}', { n: x.likes ?? 0 }))}</div></button></li>`).join('')}</ul>` : ''}
+    ${postList(w, x => `<div class="t">${esc(x.title)} <span class="muted">[${esc(x.comments ?? 0)}]</span></div><div class="m">${esc(x.author || anon)} | ${esc(T('Views {n}', { n: x.views ?? 0 }))} | ${esc(T('Likes {n}', { n: x.likes ?? 0 }))}</div>`)}
     ${
       p
         ? `<div class="post"><h6>${esc(p.title)}</h6><div class="pm">${esc(p.author || anon)} | ${esc(T('Views {n}', { n: p.views ?? 0 }))}</div><div class="pb">${esc(p.body || '')}</div>
@@ -62,9 +77,59 @@ function galleryHtml(w) {
         : ''
     }</div>`;
 }
-function messengerHtml(w) {
-  return `<div class="w w-msg"><div class="mh"><small>${esc(w.app || Tc('app', 'Messenger'))}</small>${esc(w.room || T('Chat'))}</div><div class="ms">${(w.messages || []).map(m => `<div class="m ${m.me ? 'me' : ''}">${m.me ? '' : `<small>${esc(m.from)}</small>`}<p>${esc(m.text)}</p></div>`).join('')}</div></div>`;
+function redditHtml(w, p, anon) {
+  const sub = 'r/' + String(w.board || T('Board')).replace(/\s+(\S)/g, (m, c) => c.toUpperCase());
+  const vote = n => `<span class="rv"><i>▲</i><b>${short(n)}</b><i>▼</i></span>`;
+  const cmts = n => `💬 ${esc(T('{n} {n|comment|comments}', { n: n ?? 0 }))}`;
+  return `<div class="w w-gal g-reddit"><div class="gh"><span class="ico">r/</span><div><div>${esc(sub)}</div><small>${esc(w.site || T('Community'))}</small></div></div>
+    ${postList(w, x => `${vote(x.likes)}<div><div class="m">u/${esc(x.author || anon)} · ${esc(T('Views {n}', { n: short(x.views) }))}</div><div class="t">${esc(x.title)}</div><div class="m">${cmts(x.comments)}</div></div>`)}
+    ${
+      p
+        ? `<div class="post"><div class="pm">${esc(sub)} · u/${esc(p.author || anon)}</div><h6>${esc(p.title)}</h6><div class="pb">${esc(p.body || '')}</div>
+      <div class="bar">${vote((p.likes || 0) - (p.dislikes || 0))}<span>${cmts((p.comments || []).length)}</span></div>
+      <div class="cmts">${(p.comments || []).map(c => `<div class="cmt ${c.reply ? 're' : ''}"><small>u/${esc(c.author || anon)}</small>${esc(c.text)}</div>`).join('')}</div></div>`
+        : ''
+    }</div>`;
 }
+function chHtml(w, p, anon) {
+  const res = (c, n, to) =>
+    `<dl class="res"><dt><span class="n">${n}</span> ：<b>${esc(c.author || anon)}</b> <span class="id">ID:${posterId(`${c.author || n}|${p.title}`)}</span></dt><dd>${to ? `<span class="anc">&gt;&gt;${to}</span><br>` : ''}${esc(c.text || '')}</dd></dl>`;
+  return `<div class="w w-gal g-5ch"><div class="gh">${esc(w.board || T('Board'))}<small>＠${esc(w.site || T('Community'))}</small></div>
+    ${postList(w, (x, i) => `<span class="n">${i + 1}:</span> <span class="t">${esc(x.title)}</span> <span class="c">(${esc(x.comments ?? 0)})</span>`)}
+    ${p ? `<div class="post"><h6>${esc(p.title)}</h6>${res({ author: p.author, text: p.body }, 1)}${(p.comments || []).map((c, i) => res(c, i + 2, c.reply ? i + 1 : 0)).join('')}</div>` : ''}</div>`;
+}
+function nicoHtml(w, p, anon) {
+  const stats = (v, c, l) => `<span>▶ ${short(v)}</span><span>💬 ${short(c)}</span><span>★ ${short(l)}</span>`;
+  const flow = (p && p.comments ? p.comments : [])
+    .slice(0, 12)
+    // six lanes; negative delays start them mid-flight and half a lap apart within a lane
+    .map(
+      (c, i) =>
+        `<span style="top:${6 + (i % 6) * 14}%;animation-delay:-${(i % 6) * 1.5 + Math.floor(i / 6) * 4.5}s">${esc(c.text)}</span>`,
+    )
+    .join('');
+  return `<div class="w w-gal g-nico"><div class="gh">${esc(w.board || T('Board'))}<small>${esc(w.site || T('Community'))}</small></div>
+    ${postList(w, x => `<span class="th">▶</span><div><div class="t">${esc(x.title)}</div><div class="m">${stats(x.views, x.comments, x.likes)}</div><div class="m">${esc(x.author || anon)}</div></div>`)}
+    ${
+      p
+        ? `<div class="post"><div class="player"><div class="pt">${esc(p.title)}</div><div class="flow">${flow}</div></div><h6>${esc(p.title)}</h6><div class="m">${stats(p.views, (p.comments || []).length, p.likes)} · ${esc(p.author || anon)}</div><div class="pb">${esc(p.body || '')}</div>
+      <div class="cmts">${(p.comments || []).map(c => `<div class="cmt"><small>${esc(c.author || anon)}</small>${esc(c.text)}</div>`).join('')}</div></div>`
+        : ''
+    }</div>`;
+}
+const BOARDS = { dc: dcHtml, reddit: redditHtml, '5ch': chHtml, nico: nicoHtml };
+const galleryHtml = w => (BOARDS[widgetStyle('boardStyle')] || dcHtml)(w, w.post, T('Anon'));
+
+const msgs = (w, one) => (w.messages || []).map(one).join('');
+const CHATS = {
+  kakao: w =>
+    `<div class="w w-msg"><div class="mh"><small>${esc(w.app || Tc('app', 'Messenger'))}</small>${esc(w.room || T('Chat'))}</div><div class="ms">${msgs(w, m => `<div class="m ${m.me ? 'me' : ''}">${m.me ? '' : `<small>${esc(m.from)}</small>`}<p>${esc(m.text)}</p></div>`)}</div></div>`,
+  whatsapp: w =>
+    `<div class="w w-msg c-wa"><div class="mh">${avatar(w.room)}<div>${esc(w.room || T('Chat'))}<small>${esc(w.app || Tc('app', 'Messenger'))}</small></div></div><div class="ms">${msgs(w, m => `<div class="m ${m.me ? 'me' : ''}"><p>${m.me ? '' : `<small>${esc(m.from)}</small>`}${esc(m.text)}${m.me ? '<span class="tk">✓✓</span>' : ''}</p></div>`)}</div></div>`,
+  line: w =>
+    `<div class="w w-msg c-line"><div class="mh">${esc(w.room || T('Chat'))}<small>${esc(w.app || Tc('app', 'Messenger'))}</small></div><div class="ms">${msgs(w, m => (m.me ? `<div class="m me"><span class="rd">${T('Read')}</span><p>${esc(m.text)}</p></div>` : `<div class="m">${avatar(m.from)}<div><small>${esc(m.from)}</small><p>${esc(m.text)}</p></div></div>`))}</div></div>`,
+};
+const messengerHtml = w => (CHATS[widgetStyle('chatStyle')] || CHATS.kakao)(w);
 // a constellation board (the /성좌 command) is a gallery whose site or board names the constellations
 const isStarBoard = w => mentionsStars((w.site || '') + (w.board || ''));
 

@@ -1,0 +1,273 @@
+{
+  "name": "Doyun",
+  "inputs": {
+    "look": "Look around",
+    "walk": "Keep walking",
+    "judgeTyping": "/wh",
+    "judge": "/why How did that check go?",
+    "chat": "/chat Ramen tonight?",
+    "chatAgain": "/chat Hey",
+    "board": "/board",
+    "news": "/news",
+    "quest": "/quest",
+    "star": "/star"
+  },
+  "free": {
+    "origin": "Night-shift convenience store clerk",
+    "worldNote": "My childhood friend Seoyun lives next door. She acts cold but always looks out for me. The phone shop owner only ever goes by 'the Daesung Mobile boss'."
+  },
+  "titles": [
+    ["Alley Survivor", "+3 to crisis checks"],
+    ["First Quest Cleared", "+10% quest rewards"],
+    ["Famous Regular", "-5% shop prices"]
+  ],
+  "titlesOn": [0, 2],
+  "merge": ["Daesung Mobile owner", "Daesung Mobile boss"],
+  "callout": ["Silhouette: a shared face for extras", "Retired: never assigned"],
+  "awaken": {
+    "origin": "Slum pickpocket",
+    "age": 12,
+    "race": "Human (Awakened)",
+    "date": "2035-04-03",
+    "time": "11:56 PM",
+    "weather": "Cloudy, cold wind",
+    "place": "Back alley, nightlife district",
+    "gold": 65000,
+    "skill": { "name": "Knack", "grade": "C", "desc": "Good at cooking and cleaning" },
+    "quests": [
+      { "title": "Tomorrow's quota: 6", "note": "One wallet confiscated, one in hand. Five hours until dawn." },
+      {
+        "title": "Raise 150,000 won for the test",
+        "note": "A private testing center would take 100,000. 38,000 so far. Not happening tonight."
+      }
+    ],
+    "stateNote": "A drunk grabbed you by the collar in the back alley and took a photo of your face. He took one wallet, so only one is left (quota 1/6). The rib pain is getting worse."
+  },
+  "replies": {
+    "open": {
+      "admin": "Viewing tip: our lead is standing in the middle of a gate zone without an umbrella. A bold opening.",
+      "narration": "You stop at the end of a wet alley. Sirens bleed in from somewhere far off, and the convenience store sign flickers, half dead. \"Where am I?\" The answer comes from your feet: a squeak. A sewer rat is studying your shoelaces with great seriousness.",
+      "system": ["[ Crisis: A Lost Sewer Rat ]"],
+      "choices": [
+        "Shoo the rat away with a broom (success chance 60%)",
+        "Head deeper into the alley (success chance 35%)",
+        "Run for it"
+      ],
+      "stat_changes": { "hp": -2, "power": 1 },
+      "title": "Alley Survivor",
+      "title_effect": "+3 to crisis checks",
+      "memory": {
+        "lore": [{ "key": "Sewer rat", "text": "Very interested in your shoelaces" }],
+        "relations": [
+          { "name": "Daesung Mobile boss", "note": "Runs the phone shop in the alley. Generous to regulars" },
+          { "name": "Daesung Mobile owner", "note": "Owns the phone shop on the corner. Gave you a discount once" },
+          { "name": "Seoyun", "note": "Childhood friend. Acts cold on the outside" }
+        ],
+        "state_note": "A rainy alley",
+        "quests": []
+      }
+    },
+    "roll": {
+      "admin": "Was that an attack or a dance routine? Lucky for you, the rat held back its applause.",
+      "narration": "You raise the broom high. The rat doesn't even flinch. It climbs onto the bristles and stares back at you. The rain keeps falling, and your pride quietly soaks through.",
+      "choices": ["Keep the staring contest going", "Just walk past"]
+    },
+    "intro": {
+      "admin": "Welcome. I'm ADMIN, your guide for this life. There are no refunds.",
+      "narration": "You open your eyes to storm clouds instead of a ceiling. This life has a clear concept from the very start.",
+      "choices": ["Get up first", "Stay down and file a complaint with the sky"]
+    },
+    "judge": {
+      "narration": "Chasing off one rat with a broom was set at a 60% chance. The dice decided the rest, and the wet ground made it into the story.",
+      "objection": { "upheld": false, "no_check": false }
+    },
+    "nodice": {
+      "admin": "The dice have the day off. Plausibility is working overtime instead.",
+      "narration": "You take one step toward the rat, broom raised. It thinks it over, then slips into the drain. A fine negotiation. For both sides.",
+      "choices": ["Head deeper into the alley", "Buy an umbrella at the convenience store", "Text Seoyun"]
+    },
+    "messenger": {
+      "admin": "Ready to become a master of leaving people on read?",
+      "narration": "Your phone buzzes. The two quietest people in the group chat start talking at once.",
+      "widget": {
+        "type": "messenger",
+        "app": "Chirp",
+        "room": "Hunter party",
+        "messages": [
+          { "from": "Me", "text": "Ramen tonight?", "me": true },
+          { "from": "Leon", "text": "Sure. Front gate at 7" },
+          { "from": "Mia", "text": "I'm in! I'll save us a table" }
+        ]
+      }
+    },
+    "gallery": {
+      "admin": "Anonymous boards always reach the scene before you do.",
+      "narration": "You open the community app. There are already thirty posts.",
+      "widget": {
+        "type": "gallery",
+        "site": "GateWatch",
+        "board": "Live gate news",
+        "posts": [
+          {
+            "title": "[BREAKING] Surprise C-rank gate opens on the Hwagok General Hospital lot",
+            "author": "eastside_9",
+            "views": 24180,
+            "likes": 412,
+            "comments": 336
+          },
+          { "title": "How does a gate open at a HOSPITAL", "author": "", "views": 9021, "likes": 188, "comments": 97 },
+          {
+            "title": "Association ETA 17 minutes... 17???",
+            "author": "awakened5yrs",
+            "views": 15302,
+            "likes": 501,
+            "comments": 244
+          }
+        ]
+      }
+    },
+    "star": {
+      "admin": "For the record, the viewers on this channel bet coins on your failures.",
+      "narration": "A translucent window rises in the air. The constellations' channel seems to be open.",
+      "widget": {
+        "type": "gallery",
+        "site": "Starlight Channel",
+        "board": "Constellation viewing gallery",
+        "posts": [
+          {
+            "title": "[Sponsor] 100 coins says he loses to a rat today",
+            "author": "Golden Watcher",
+            "views": 3120,
+            "likes": 88,
+            "comments": 41
+          },
+          {
+            "title": "Picking THAT choice against an alley rat...",
+            "author": "Crimson Star",
+            "views": 1900,
+            "likes": 52,
+            "comments": 23
+          }
+        ]
+      }
+    },
+    "news": {
+      "admin": "The news usually arrives late. Today it delivers misfortune right on time.",
+      "narration": "Breaking news spills from the convenience store TV.",
+      "widget": {
+        "type": "news",
+        "section": "Society",
+        "outlet": "Hunter Daily",
+        "time": "3 PM",
+        "headline": "Signs of an S-rank gate over Seoul",
+        "reporter": "Kim",
+        "body": "The Association says it has moved to emergency response.",
+        "quotes": ["\"Citizens, please evacuate calmly.\""]
+      }
+    },
+    "quest": {
+      "admin": "The reward is three silver coins. For one sheep, that's surprisingly realistic.",
+      "narration": "A new request is pinned to a corner of the board.",
+      "widget": {
+        "type": "quest",
+        "board": "Adventurers' Guild board",
+        "quests": [
+          {
+            "title": "Find the lost sheep",
+            "client": "Hans the shepherd",
+            "deadline": "In three days",
+            "difficulty": 2,
+            "body": "A sheep has gone missing. It was last seen near the north hill.",
+            "location": "North hill",
+            "reward": "3 silver coins",
+            "status": "Open"
+          }
+        ]
+      }
+    },
+    "aftermath": {
+      "admin": "A thought: having a plan is a beautiful thing. Especially when it's someone else's.",
+      "narration": "The rain eases a little. The streetlight at the end of the alley flickers once, then goes out for good.",
+      "choices": ["Knock on the streetlight", "Walk into the dark"]
+    },
+    "boxes": {
+      "narration": "Scar stubs out his cigarette. \"So, how many are left?\"\n[ Quota check: 3 of 6 ]\n[ Warning: two decoys by sunrise tomorrow ]",
+      "system": [
+        "[ Title acquired: Two Fingers ]",
+        "【 The country's first S-rank gate has opened over Seoul 】",
+        "〈 The constellation 'Golden Watcher' regards you with interest 〉"
+      ],
+      "choices": []
+    },
+    "board": {
+      "admin": "Anonymous boards always reach the scene before you do.",
+      "narration": "You open the community app.",
+      "widget": {
+        "type": "gallery",
+        "site": "GateWatch",
+        "board": "Live gate news",
+        "posts": [
+          {
+            "title": "[BREAKING] Surprise C-rank gate opens on the Hwagok General Hospital lot",
+            "author": "eastside_9",
+            "views": 24180,
+            "likes": 412,
+            "comments": 336
+          },
+          { "title": "How does a gate open at a HOSPITAL", "author": "", "views": 9021, "likes": 188, "comments": 97 },
+          {
+            "title": "Association ETA 17 minutes... 17???",
+            "author": "awakened5yrs",
+            "views": 15302,
+            "likes": 501,
+            "comments": 244
+          },
+          {
+            "title": "C-rank means goblin types, right? The nursery is on the 3rd floor",
+            "author": "dungeon_nerd",
+            "views": 7744,
+            "likes": 96,
+            "comments": 58
+          },
+          {
+            "title": "(pic) The north parking lot shutters just came down",
+            "author": "parcel_guy",
+            "views": 11908,
+            "likes": 233,
+            "comments": 141
+          },
+          {
+            "title": "Mana stone prices are about to jump. Anyone buying?",
+            "author": "seol_trading",
+            "views": 3310,
+            "likes": 41,
+            "comments": 88
+          },
+          {
+            "title": "The rooftop helipad is the safest spot. Speaking from experience",
+            "author": "ex_rescue",
+            "views": 6620,
+            "likes": 377,
+            "comments": 112
+          }
+        ],
+        "post": {
+          "title": "[BREAKING] Surprise C-rank gate opens on the Hwagok General Hospital lot",
+          "author": "eastside_9",
+          "views": 24180,
+          "body": "Around 11:48 the sky just tore open over the parking lot. Purple rift, you can see it with your own eyes. You can hear the hospital PA from outside. Word is every window in the first-floor lobby blew out. The Association's west branch is on the way but it'll take 15+ minutes. There are patients and a nursery in there. Please let everyone be okay.",
+          "likes": 412,
+          "dislikes": 7,
+          "comments": [
+            {
+              "author": "awakened5yrs",
+              "text": "The first five minutes of a surprise C-rank are the worst. Don't go down. Always up."
+            },
+            { "author": "", "text": "^ this. if the rift is on the lot it floods from the basement up", "reply": true },
+            { "author": "ratwatcher", "text": "is the convenience store guy across the street ok" }
+          ]
+        }
+      }
+    }
+  }
+}

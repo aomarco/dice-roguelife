@@ -39,7 +39,7 @@ export default [
   },
   {
     // specs run in Node, and the functions they hand to page.evaluate run in the page, where window.DR is the game
-    files: ['tests/**/*.js'],
+    files: ['tests/**/*.js', 'tools/shots.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'module',

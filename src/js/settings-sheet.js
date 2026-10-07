@@ -129,7 +129,24 @@ function settingsHtml() {
         ['paper', N_('Newspaper (serif)')],
       ],
     )}</select></div>
-    <label class="row opt settings-opt"><input type="checkbox" id="wdark"> ${T('Dark mode for messenger and board widgets too (default: yellow chat, white board)')}</label>
+    <div class="field settings-field near"><label for="boardSel">${T('Board style')}</label><select id="boardSel">${options(
+      [
+        ['auto', N_('Auto: by story language')],
+        ['dc', N_('DC Inside (Korean forum)')],
+        ['reddit', N_('Reddit')],
+        ['5ch', N_('5ch (Japanese threads)')],
+        ['nico', N_('Niconico (comments across a video)')],
+      ],
+    )}</select></div>
+    <div class="field settings-field near"><label for="chatSel">${T('Messenger style')}</label><select id="chatSel">${options(
+      [
+        ['auto', N_('Auto: by story language')],
+        ['kakao', N_('KakaoTalk')],
+        ['whatsapp', N_('WhatsApp')],
+        ['line', N_('LINE')],
+      ],
+    )}</select></div>
+    <label class="row opt settings-opt"><input type="checkbox" id="wdark"> ${T('Dark mode for messenger and board widgets too')}</label>
     <label class="row opt settings-opt"><input type="checkbox" id="soundOn"> ${T('Sound effects (fate reveal, realm and title fanfares, skills, items and money, quest complete, death, Life Review)')}</label>
     <details class="diag-box"><summary class="muted">${T('Diagnostics')}</summary><div id="diag" class="muted diag-body">${T('Checking...')}</div></details>
     <details class="diag-box"><summary class="muted">${T('Recent errors')} ${ERRLOG.length ? `(${ERRLOG.length})` : ''}</summary><div class="diag-body diag-log">${ERRLOG.map(e => `[${e.t}] ${e.stage} ${e.code} ${esc(e.msg)}${e.text ? '\n  → ' + esc(e.text) : ''}`).join('\n\n') || T('None')}</div></details>
@@ -211,6 +228,7 @@ const PLAIN_SETTINGS = [
     key: 'lang',
     show: v => v || '',
     parse: v => v || null,
+    apply: redrawLog, // 'auto' board and messenger styles follow it
     saved: NEXT_TURN,
   },
   { id: 'langTip', key: 'langTip' },
@@ -260,6 +278,8 @@ const PLAIN_SETTINGS = [
     apply: redrawLog,
     saved: SAVED,
   },
+  { id: 'boardSel', key: 'boardStyle', apply: redrawLog, saved: SAVED },
+  { id: 'chatSel', key: 'chatStyle', apply: redrawLog, saved: SAVED },
   { id: 'wdark', key: 'wdark', apply: () => applyDiscreet() },
   {
     id: 'soundOn',

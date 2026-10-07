@@ -114,6 +114,16 @@ body {
   word-break: keep-all;
   overflow-wrap: anywhere;
 }
+/* keep-all keeps Korean words whole; Japanese has no spaces, so it would only break at punctuation */
+html:lang(ja) :is(body, .narr, .w-news-head h4) {
+  word-break: normal;
+  line-break: strict;
+}
+@supports (word-break: auto-phrase) {
+  html:lang(ja) :is(body, .narr, .w-news-head h4) {
+    word-break: auto-phrase;
+  }
+}
 button,
 input,
 textarea,
@@ -1737,6 +1747,459 @@ html.discreet .w-gal .votes b {
   border-radius: 14px 4px 14px 14px;
 }
 
+/* board and messenger styles (widgets.js BOARDS, CHATS); the dark rules follow the widget dark mode */
+.w-msg .av {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+.w-gal.g-reddit {
+  background: #dae0e6;
+  color: #1c1c1c;
+}
+.w-gal.g-reddit .gh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  color: #1c1c1c;
+  border-bottom: 1px solid #edeff1;
+}
+.w-gal.g-reddit .gh .ico {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ff4500;
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 14px;
+}
+.w-gal.g-reddit .gh div div {
+  font-size: 16px;
+  font-weight: 700;
+}
+.w-gal.g-reddit .gh small {
+  color: #787c7e;
+  opacity: 1;
+}
+.w-gal.g-reddit ul {
+  background: transparent;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.w-gal.g-reddit li button {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 8px 12px 8px 6px;
+}
+.w-gal.g-reddit .rv {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 36px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #878a8c;
+}
+.w-gal.g-reddit .rv i {
+  font-style: normal;
+}
+.w-gal.g-reddit .rv i:first-child {
+  color: #ff4500;
+}
+.w-gal.g-reddit .rv b {
+  color: #1c1c1c;
+}
+.w-gal.g-reddit li .t {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 2px 0;
+}
+.w-gal.g-reddit li .m,
+.w-gal.g-reddit .post .pm {
+  color: #787c7e;
+}
+.w-gal.g-reddit .post {
+  margin: 0 8px 8px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+.w-gal.g-reddit .post h6 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.w-gal.g-reddit .bar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 12px 0 4px;
+  font-size: 12px;
+  color: #787c7e;
+}
+.w-gal.g-reddit .bar .rv {
+  flex-direction: row;
+  gap: 6px;
+  background: #f6f7f8;
+  border-radius: 14px;
+  padding: 3px 10px;
+}
+.w-gal.g-reddit .cmts {
+  border-top: 0;
+}
+.w-gal.g-reddit .cmt {
+  border-bottom: 0;
+  border-left: 2px solid #edeff1;
+  padding: 4px 0 4px 10px;
+  margin-top: 8px;
+}
+.w-gal.g-reddit .cmt small {
+  color: #1c1c1c;
+  font-weight: 600;
+}
+.w-gal.g-reddit .cmt.re {
+  margin-left: 16px;
+  background: none;
+}
+.w-gal.g-reddit .cmt.re small::before {
+  content: '';
+}
+html:is(.wdark, .discreet) .w-gal.g-reddit {
+  background: #030303;
+  color: #d7dadc;
+}
+html:is(.wdark, .discreet) .w-gal.g-reddit .gh,
+html:is(.wdark, .discreet) .w-gal.g-reddit li button,
+html:is(.wdark, .discreet) .w-gal.g-reddit .post {
+  background: #1a1a1b;
+  color: #d7dadc;
+  border-color: #343536;
+}
+html:is(.wdark, .discreet) .w-gal.g-reddit ul {
+  background: transparent;
+}
+html:is(.wdark, .discreet) .w-gal.g-reddit .rv b,
+html:is(.wdark, .discreet) .w-gal.g-reddit .cmt small {
+  color: #d7dadc;
+}
+html:is(.wdark, .discreet) .w-gal.g-reddit .bar .rv {
+  background: #272729;
+}
+html:is(.wdark, .discreet) .w-gal.g-reddit .cmt {
+  border-left-color: #343536;
+}
+
+.w-gal.g-5ch,
+.w-gal.g-5ch ul,
+.w-gal.g-5ch .post {
+  background: #efefef;
+  color: #000;
+}
+.w-gal.g-5ch .gh {
+  background: #fff;
+  color: #000;
+  border-bottom: 2px solid #cfcfcf;
+  font-size: 15px;
+  font-weight: 700;
+}
+.w-gal.g-5ch .gh small {
+  margin-left: 4px;
+  font-weight: 400;
+  color: #666;
+  opacity: 1;
+}
+.w-gal.g-5ch ul {
+  padding: 6px 12px;
+}
+.w-gal.g-5ch li button {
+  border: 0;
+  padding: 3px 0;
+  font-size: 14px;
+  color: #000;
+}
+.w-gal.g-5ch li .t,
+.w-gal.g-5ch .anc {
+  color: #00e;
+  text-decoration: underline;
+}
+.w-gal.g-5ch .post {
+  border-top: 1px solid #cfcfcf;
+}
+.w-gal.g-5ch .post h6 {
+  color: #f00;
+  font-size: 17px;
+  font-weight: 400;
+  margin: 0 0 10px;
+}
+.w-gal.g-5ch .res {
+  margin: 0 0 12px;
+}
+.w-gal.g-5ch .res dt {
+  font-size: 13px;
+  color: #333;
+}
+.w-gal.g-5ch .res dt b {
+  color: #008000;
+}
+.w-gal.g-5ch .res dt .id {
+  color: #666;
+}
+.w-gal.g-5ch .res dd {
+  margin: 2px 0 0 22px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+html:is(.wdark, .discreet) .w-gal.g-5ch,
+html:is(.wdark, .discreet) .w-gal.g-5ch ul,
+html:is(.wdark, .discreet) .w-gal.g-5ch .post,
+html:is(.wdark, .discreet) .w-gal.g-5ch li button {
+  background: #1b1b1b;
+  color: #ddd;
+}
+html:is(.wdark, .discreet) .w-gal.g-5ch .gh {
+  background: #262626;
+  color: #eee;
+  border-color: #3a3a3a;
+}
+html:is(.wdark, .discreet) .w-gal.g-5ch li .t,
+html:is(.wdark, .discreet) .w-gal.g-5ch .anc {
+  color: #8ab4f8;
+}
+html:is(.wdark, .discreet) .w-gal.g-5ch .post h6 {
+  color: #ff6b6b;
+}
+html:is(.wdark, .discreet) .w-gal.g-5ch .res dt {
+  color: #bbb;
+}
+html:is(.wdark, .discreet) .w-gal.g-5ch .res dt b {
+  color: #5fd35f;
+}
+
+.w-gal.g-nico,
+.w-gal.g-nico ul,
+.w-gal.g-nico .post {
+  background: #fff;
+  color: #252525;
+}
+.w-gal.g-nico .gh {
+  background: #252525;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+}
+.w-gal.g-nico .gh small {
+  display: block;
+  font-weight: 400;
+}
+.w-gal.g-nico li button {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 8px 12px;
+}
+.w-gal.g-nico .th {
+  flex: none;
+  width: 96px;
+  aspect-ratio: 16 / 9;
+  border-radius: 4px;
+  background: linear-gradient(135deg, #3a3a3a, #111);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+.w-gal.g-nico li .t {
+  font-weight: 600;
+}
+.w-gal.g-nico .m {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11.5px;
+  color: #666;
+}
+.w-gal.g-nico .player {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #000;
+  border-radius: 6px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.w-gal.g-nico .pt {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0 12%;
+  text-align: center;
+  color: #fff;
+  opacity: 0.35;
+}
+.w-gal.g-nico .flow span {
+  position: absolute;
+  white-space: nowrap;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  text-shadow:
+    0 0 2px #000,
+    1px 1px 2px #000;
+  animation: nico-flow 9s linear infinite;
+}
+@keyframes nico-flow {
+  from {
+    left: 100%;
+    transform: translateX(0);
+  }
+  to {
+    left: 0;
+    transform: translateX(-100%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w-gal.g-nico .flow span {
+    animation-play-state: paused;
+  }
+}
+.w-gal.g-nico .cmt {
+  border-color: #eee;
+}
+html:is(.wdark, .discreet) .w-gal.g-nico,
+html:is(.wdark, .discreet) .w-gal.g-nico ul,
+html:is(.wdark, .discreet) .w-gal.g-nico .post,
+html:is(.wdark, .discreet) .w-gal.g-nico li button {
+  background: #1e1e1e;
+  color: #e8e8e8;
+}
+html:is(.wdark, .discreet) .w-gal.g-nico .gh {
+  background: #111;
+}
+html:is(.wdark, .discreet) .w-gal.g-nico .m {
+  color: #aaa;
+}
+
+.w-msg.c-wa {
+  background: #efeae2;
+  color: #111b21;
+}
+.w-msg.c-wa .mh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #008069;
+  color: #fff;
+  border-bottom: 0;
+}
+.w-msg.c-wa .m p {
+  background: #fff;
+  color: #111b21;
+  border-radius: 0 8px 8px 8px;
+  box-shadow: 0 1px 0.5px rgba(11, 20, 26, 0.13);
+}
+.w-msg.c-wa .m p small {
+  margin: 0 0 1px;
+  color: #1f8a70;
+  font-weight: 600;
+  opacity: 1;
+}
+.w-msg.c-wa .m.me p {
+  background: #d9fdd3;
+  border-radius: 8px 0 8px 8px;
+}
+.w-msg.c-wa .tk {
+  margin-left: 8px;
+  font-size: 11px;
+  letter-spacing: -3px;
+  color: #53bdeb;
+}
+html:is(.wdark, .discreet) .w-msg.c-wa {
+  background: #0b141a;
+  color: #e9edef;
+}
+html:is(.wdark, .discreet) .w-msg.c-wa .mh,
+html:is(.wdark, .discreet) .w-msg.c-wa .m p {
+  background: #202c33;
+  color: #e9edef;
+}
+html:is(.wdark, .discreet) .w-msg.c-wa .m.me p {
+  background: #005c4b;
+  color: #e9edef;
+}
+
+.w-msg.c-line {
+  background: #8cabd8;
+  color: #111;
+}
+.w-msg.c-line .mh {
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+}
+.w-msg.c-line .m {
+  display: flex;
+  gap: 7px;
+  align-items: flex-start;
+  max-width: 85%;
+}
+.w-msg.c-line .m small {
+  margin: 0 0 3px 2px;
+  color: #1d2b3f;
+}
+.w-msg.c-line .m p {
+  background: #fff;
+  color: #111;
+  border-radius: 4px 18px 18px 18px;
+}
+.w-msg.c-line .m.me {
+  align-items: flex-end;
+  gap: 5px;
+}
+.w-msg.c-line .m.me p {
+  background: #8de055;
+  border-radius: 18px 4px 18px 18px;
+}
+.w-msg.c-line .rd {
+  font-size: 10.5px;
+  white-space: nowrap;
+  color: #1d2b3f;
+  opacity: 0.8;
+}
+html:is(.wdark, .discreet) .w-msg.c-line {
+  background: #1d2433;
+  color: #e8eaf0;
+}
+html:is(.wdark, .discreet) .w-msg.c-line .mh {
+  background: #151a25;
+  color: #e8eaf0;
+}
+html:is(.wdark, .discreet) .w-msg.c-line .m p {
+  background: #2b3446;
+  color: #e8eaf0;
+}
+html:is(.wdark, .discreet) .w-msg.c-line .m.me p {
+  background: #3fa83a;
+  color: #fff;
+}
+html:is(.wdark, .discreet) .w-msg.c-line .m small,
+html:is(.wdark, .discreet) .w-msg.c-line .rd {
+  color: #aab3c5;
+}
+
 /* sheets & cards */
 .sheet {
   position: fixed;
@@ -2218,6 +2681,9 @@ html.discreet .sk {
 .nl-lang select {
   width: auto;
   padding: 4px 8px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 8px;
 }
 .field {
   display: flex;
@@ -3083,6 +3549,14 @@ html.discreet .sysmsg .win.big .t {
 .opt {
   gap: 6px;
   font-size: 13px;
+}
+/* a long label wraps beside its checkbox instead of dropping below it */
+label.row.opt {
+  flex-wrap: nowrap;
+  align-items: baseline;
+}
+label.row.opt > input {
+  flex: none;
 }
 .dlg-msg {
   margin: 4px 0 10px;

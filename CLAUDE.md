@@ -36,3 +36,8 @@ English is the source language. Each other language is a JSON map keyed by the E
   `i18n-ignore-start` / `i18n-ignore-end` block).
 - Tests run with a Korean browser (`locale: 'ko-KR'` in `tests/support/test.js`); pass `{ locale: 'en-US' }` or
   `'ja-JP'` to `game()` (`tests/i18n-lang.spec.js`).
+
+## Guide screenshots
+
+`node tools/shots.js <ko|en|ja> [groups]` captures the site's screenshots into `docs/images/<name>-<lang>.png` with a
+mocked narrator (`tools/shots/<lang>.json`); the site swaps them by language. Recapture after a visible UI change.
