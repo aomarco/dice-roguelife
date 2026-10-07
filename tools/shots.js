@@ -1,6 +1,6 @@
 // Screenshots for the guide site, one language per run: docs/images/<name>-<lang>.png
 //   node tools/shots.js en              every shot
-//   node tools/shots.js ja play extra   some groups (new, play, misc, desk, images, styles, extra)
+//   node tools/shots.js ja play extra   some groups (new, play, misc, desk, images, styles, promo, extra)
 // The story in the shots is fake (tools/shots/<lang>.json) and the faces are drawn placeholders. The image-tab shots
 // can show real art instead: DR_SHOT_ART=<folder> with <id>.webp files named as in ART below.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const LOCALES = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP' };
 const [lang, ...only] = process.argv.slice(2);
 if (!LOCALES[lang]) {
-  console.log('usage: node tools/shots.js <ko|en|ja> [new play misc desk images styles extra]');
+  console.log('usage: node tools/shots.js <ko|en|ja> [new play misc desk images styles promo extra]');
   process.exit(1);
 }
 const S = JSON.parse(readFileSync(join(ROOT, 'tools', 'shots', `${lang}.json`), 'utf8'));
@@ -535,6 +535,30 @@ const GROUPS = {
         await snapEl(pg, '#log .w', `style-${look}`);
       }
     }
+    await ctx.close();
+  },
+
+  // phone screens for posts elsewhere: the board and the messenger inside the chat, from the player's command down
+  async promo(browser) {
+    const { ctx, pg } = await open(browser);
+    await begin(pg);
+    await openScene(pg);
+    await pg.evaluate(() => {
+      const b = window.__R.board;
+      window.__R.promo = { ...b, widget: { ...b.widget, posts: b.widget.posts.slice(0, 3) } };
+    });
+    const fromCommand = async name => {
+      await pg.evaluate(() => {
+        const u = [...document.querySelectorAll('#log .turn.u')].pop();
+        document.querySelector('#log').scrollTop += u.getBoundingClientRect().top - 290;
+      });
+      await wait(pg, 400);
+      await snap(pg, name);
+    };
+    await say(pg, S.inputs.board, 'promo', 1500);
+    await fromCommand('promo-board');
+    await say(pg, S.inputs.chat, 'messenger', 1500);
+    await fromCommand('promo-chat');
     await ctx.close();
   },
 
