@@ -82,6 +82,25 @@ test('/reddit shows a Reddit board in any story language, and its posts open thr
   expect(errs).toEqual([]);
 });
 
+test('/dc and /nico force their looks too', async ({ game }) => {
+  const { pg, errs } = await game(claudeMock(reply), { locale: 'en-US' });
+  await pg.waitForSelector('#rollBtn');
+  await startLife(pg, { name: 'Jin' });
+  await pg.evaluate(x => (window.__W = x), BOARD);
+  for (const [cmd, cls] of [
+    ['/dc', 'w w-gal'],
+    ['/niconico', 'w w-gal g-nico'],
+    ['/board', 'w w-gal g-reddit'],
+  ]) {
+    const n = await pg.evaluate(() => DR.app.turns.filter(t => t.out?.widget).length);
+    await pg.evaluate(c => DR.send(c), cmd);
+    await pg.waitForFunction(n => DR.app.turns.filter(t => t.out?.widget).length === n + 1, n);
+    const got = await pg.evaluate(() => [...document.querySelectorAll('#log .w')].pop().className);
+    check(errs, `${cmd} in an English story: ${got}`, got === cls);
+  }
+  expect(errs).toEqual([]);
+});
+
 test('a picked style wins over the story language, and every style draws the posts and the thread', async ({
   game,
 }) => {

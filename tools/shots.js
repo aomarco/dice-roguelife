@@ -1,6 +1,6 @@
 // Screenshots for the guide site, one language per run: docs/images/<name>-<lang>.png
 //   node tools/shots.js en              every shot
-//   node tools/shots.js ja play extra   some groups (new, play, misc, desk, images, styles, promo, hero, extra)
+//   node tools/shots.js ja play extra   some groups (new, play, misc, desk, images, styles, promo, hero, pc, extra)
 // The story in the shots is fake (tools/shots/<lang>.json) and the faces are drawn placeholders. The image-tab shots
 // can show real art instead: DR_SHOT_ART=<folder> with <id>.webp files named as in ART below.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const LOCALES = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP' };
 const [lang, ...only] = process.argv.slice(2);
 if (!LOCALES[lang]) {
-  console.log('usage: node tools/shots.js <ko|en|ja> [new play misc desk images styles promo hero extra]');
+  console.log('usage: node tools/shots.js <ko|en|ja> [new play misc desk images styles promo hero pc extra]');
   process.exit(1);
 }
 const S = JSON.parse(readFileSync(join(ROOT, 'tools', 'shots', `${lang}.json`), 'utf8'));
@@ -620,6 +620,99 @@ const GROUPS = {
     await clean(pg);
     await pg.screenshot({ path: join(ROOT, 'docs', 'images', `promo-hero-${lang}.jpg`), type: 'jpeg', quality: 88 });
     console.log('  promo-hero');
+    await ctx.close();
+  },
+
+  // Full-width (760 px, the app's column) at 2x for posts: the system boxes in any language; in English also the hero
+  // scene's play screen and the status window over it, as JPEG for the real art.
+  async pc(browser) {
+    const ctx = await browser.newContext({
+      locale: LOCALES[lang],
+      viewport: { width: 760, height: 1300 },
+      deviceScaleFactor: 2,
+    });
+    const pg = await ctx.newPage();
+    await pg.addInitScript(MOCK);
+    await pg.goto(PAGE);
+    await pg.waitForSelector('#rollBtn');
+    await seed(pg);
+    await begin(pg);
+    await seedImages(pg, true);
+    await pg.evaluate(rows => DR.app.images.push(...rows), HERO_ROWS);
+    await say(pg, S.inputs.walk, 'boxes', 1500);
+    await snapEl(pg, '#log .turn .ai .body', 'pc-system');
+    if (!S.replies.hero1) return ctx.close();
+    await say(pg, S.inputs.hero, 'hero1', 1500);
+    await pg.evaluate(async () => {
+      const t = DR.app.turns.at(-1);
+      t.img = {
+        scene: 'bg_gate-portal_night',
+        char: 'hunter1_smirk',
+        chars: [{ id: 'hunter1_smirk', npc: t.out.speaker }],
+      };
+      await DR.turnStore.update(t);
+      DR.renderLog('keep');
+    });
+    await pg.evaluate(() => {
+      window.__scn = 'hero2';
+      DR.rnd = () => 0.22;
+    });
+    await pg.click('#log .choices [data-choice]');
+    await wait(pg, 2800);
+    await seed(pg);
+    const shotFrom = async (text, name) => {
+      const span = await pg.evaluate(text => {
+        const log = document.querySelector('#log');
+        const first = [...log.querySelectorAll('.turn.u')].find(t => t.textContent.includes(text));
+        const top = first.getBoundingClientRect().top - log.getBoundingClientRect().top + log.scrollTop;
+        return { top, content: log.scrollHeight - top, chrome: window.innerHeight - log.clientHeight };
+      }, text);
+      await pg.setViewportSize({ width: 760, height: Math.ceil(span.content + span.chrome + 12) });
+      await pg.evaluate(top => (document.querySelector('#log').scrollTop = top - 8), span.top);
+      await wait(pg, 600);
+      await clean(pg);
+      await pg.screenshot({ path: join(ROOT, 'docs', 'images', `${name}-${lang}.jpg`), type: 'jpeg', quality: 90 });
+      console.log('  ' + name);
+    };
+    await shotFrom(S.inputs.hero, 'pc-play');
+    // the status window a few turns on: awakened, titled, with skills and a new quest
+    await pg.evaluate(() => {
+      const s = DR.app.state;
+      s.statusUnlocked = true;
+      s.life.race = 'Human (Awakened)';
+      Object.assign(s.stats, {
+        hp: 96,
+        maxHp: 120,
+        power: 340,
+        fame: 45,
+        str: 6,
+        con: 7,
+        agi: 9,
+        int: 11,
+        cha: 5,
+        mag: 8,
+      });
+      s.energy = { name: 'Mana', cur: 42, max: 60 };
+      s.titles = ['Sewer Cartographer', 'Alley Survivor', 'Famous Regular'];
+      s.titleFx = {
+        'Sewer Cartographer': '+10% when selling information',
+        'Alley Survivor': '+3 to crisis checks',
+        'Famous Regular': '-5% shop prices',
+      };
+      s.titlesOn = ['Sewer Cartographer', 'Alley Survivor'];
+      s.skills.push(
+        { name: 'Pathfinder', grade: 'B', desc: 'Never loses the way underground', src: 'gained', lv: 3, at: s.next },
+        { name: 'Haggle', grade: 'C', desc: 'Gets a better price, once per deal', src: 'gained', lv: 2 },
+      );
+      s.quests.push({ title: 'Who else wants C-3?', status: 'active', note: 'Two men in suits asked about the map' });
+      s.stateNote = 'Sold a real gate map to the hunter Mira. Word is spreading on GateWatch.';
+    });
+    await pg.setViewportSize({ width: 760, height: 1500 });
+    await pg.click('#strip');
+    await wait(pg, 900);
+    await clean(pg);
+    await pg.screenshot({ path: join(ROOT, 'docs', 'images', `pc-status-${lang}.jpg`), type: 'jpeg', quality: 90 });
+    console.log('  pc-status');
     await ctx.close();
   },
 

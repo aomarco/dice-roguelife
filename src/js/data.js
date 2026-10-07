@@ -345,9 +345,17 @@ export const BASE = {
 export const CMDS = [
   { id: 'news', names: ['/news'], t: 'news', d: N_("The world's newspaper") },
   { id: 'quest', names: ['/quest', '/q'], t: 'quest', d: N_('Quest board') },
-  { id: 'board', names: ['/board', '/gallery', '/dc'], t: 'gallery', d: N_('Community board') },
+  { id: 'board', names: ['/board', '/gallery'], t: 'gallery', d: N_('Community board') },
   { id: 'reddit', names: ['/reddit'], t: 'gallery', look: 'reddit', d: N_('Community board, always in Reddit style') },
   { id: '5ch', names: ['/5ch'], t: 'gallery', look: '5ch', d: N_('Community board, always in 5ch style') },
+  { id: 'dc', names: ['/dc'], t: 'gallery', look: 'dc', d: N_('Community board, always in DC Inside style') },
+  {
+    id: 'nico',
+    names: ['/nico', '/niconico'],
+    t: 'gallery',
+    look: 'nico',
+    d: N_('Community board, always in Niconico style (comments fly across the video)'),
+  },
   {
     id: 'star',
     names: ['/star'],

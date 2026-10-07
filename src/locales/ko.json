@@ -1114,5 +1114,9 @@
   "/chat|command": "/톡",
   "/why|command": "/판정 /근거",
   "/skill|command": "/스킬 /기술",
-  "/status|command": "/상태"
+  "/status|command": "/상태",
+  "Community board, always in DC Inside style": "커뮤니티 게시판 (항상 디시 스타일)",
+  "Community board, always in Niconico style (comments fly across the video)": "커뮤니티 게시판 (항상 니코니코 스타일, 댓글이 영상 위로 흘러요)",
+  "/dc|command": "/디시",
+  "/nico|command": "/니코 /니코니코"
 }

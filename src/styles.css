@@ -2366,10 +2366,11 @@ html:is(.wdark, .discreet) .w-msg.c-line .rd {
 .sw-head .kv {
   display: flex;
   gap: 6px;
-  white-space: nowrap;
 }
+/* the label stays on one line; a long value (a race, a standing) wraps instead of running out of the window */
 .sw-head .kv > span:first-child {
   color: rgba(200, 225, 255, 0.85);
+  white-space: nowrap;
 }
 .sw-head .kv > span:first-child::after {
   content: ' :';
