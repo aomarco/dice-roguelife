@@ -4,8 +4,10 @@ import { cmdName, CMDS } from './data.js';
 import { app } from './app.js';
 import { openStatus } from './status.js';
 import { inputPh } from './log.js';
-import { N_, T } from './i18n.js';
+import { isKo, N_, T } from './i18n.js';
 import { pl } from './prompt.js';
+
+const HANGUL = /[가-힣]/; // Korean command names work everywhere but are listed only on a Korean screen
 import { openSettingsSheet } from './settings-sheet.js';
 import { send } from './turn.js';
 
@@ -157,7 +159,7 @@ function slashMenu() {
   box.innerHTML = m
     .map(
       c =>
-        `<button type="button" data-id="${c.id}"><code>${cmdName(c.id)}</code><span class="muted">${T(c.d)} <span class="cmd-alias">${[c.k, ...(c.a || [])].filter(k => k !== cmdName(c.id)).join(' ')}</span></span></button>`,
+        `<button type="button" data-id="${c.id}"><code>${cmdName(c.id)}</code><span class="muted">${T(c.d)} <span class="cmd-alias">${[c.k, ...(c.a || [])].filter(k => k !== cmdName(c.id) && (isKo() || !HANGUL.test(k))).join(' ')}</span></span></button>`,
     )
     .join('');
   box.classList.remove('hidden');
@@ -191,6 +193,7 @@ export function parseCmd(text) {
           type: c.t,
           id: c.id,
           arg: [c.preset && pl(c.preset), t.slice(k.length).trim()].filter(Boolean).join(' '),
+          ...(c.look ? { look: c.look } : {}),
         };
     }
   return null;

@@ -1,195 +1,284 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Canvas probe</title>
-<style>
-  body { font: 14px/1.5 system-ui, sans-serif; margin: 16px; background: #111; color: #eee; }
-  button { font: inherit; padding: 8px 14px; margin: 0 8px 8px 0; border-radius: 8px; border: 1px solid #555; background: #222; color: #eee; }
-  pre { white-space: pre-wrap; background: #000; padding: 12px; border-radius: 8px; font-size: 12px; }
-  .ok { color: #7f7; } .bad { color: #f77; }
-</style>
-</head>
-<body>
-<h3>Dice Roguelife: Canvas probe</h3>
-<p>Press <b>Run all</b>, wait until it says DONE, then <b>Copy results</b> and paste them back to Claude. Then reload this app once and press Run all again (that checks what was kept).</p>
-<button id="run">Run all</button><button id="copy">Copy results</button>
-<pre id="out"></pre>
-<script type="module">
-const out = document.getElementById('out');
-const lines = [];
-const log = (name, ok, detail = '') => {
-  lines.push(`${ok ? 'OK  ' : 'FAIL'} ${name}${detail ? ': ' + detail : ''}`);
-  out.textContent = lines.join('\n');
-};
-const short = v => String(typeof v === 'string' ? v : JSON.stringify(v)).replace(/\s+/g, ' ').slice(0, 240);
-const API = 'https://generativelanguage.googleapis.com/v1beta/models/';
-const apiKey = ''; // Canvas supplies the key
-const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAAEklEQVR4nGP4z8CAFWEXHbQSACj/P8Fu7N9hAAAAAElFTkSuQmCC'; // 8x8 red square
-
-async function gen(model, body, method = 'generateContent') {
-  const r = await fetch(`${API}${model}:${method}?key=${apiKey}${method === 'streamGenerateContent' ? '&alt=sse' : ''}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const text = await r.text();
-  if (!r.ok) throw new Error(`HTTP ${r.status} ${short(text)}`);
-  return text;
-}
-const textOf = raw => {
-  try {
-    const j = JSON.parse(raw);
-    return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
-  } catch {
-    return raw;
-  }
-};
-
-async function run() {
-  lines.length = 0;
-  log('page', true, `origin=${location.origin} ua=${navigator.userAgent.slice(0, 60)}`);
-  log('globals', true, `__app_id=${typeof __app_id !== 'undefined' ? __app_id : '-'} __firebase_config=${typeof __firebase_config !== 'undefined' ? 'present' : '-'} __initial_auth_token=${typeof __initial_auth_token !== 'undefined' ? 'present' : '-'}`);
-
-  for (const model of ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']) {
-    try {
-      const t0 = performance.now();
-      const raw = await gen(model, { contents: [{ role: 'user', parts: [{ text: 'Reply with the single word ok.' }] }] });
-      log(`model ${model}`, true, `${Math.round(performance.now() - t0)}ms "${short(textOf(raw))}"`);
-    } catch (e) {
-      log(`model ${model}`, false, e.message);
-    }
-  }
-  try {
-    const raw = await gen('gemini-2.5-flash', {
-      contents: [{ role: 'user', parts: [{ text: 'Return {"a":1,"b":"two"} as JSON.' }] }],
-      generationConfig: { responseMimeType: 'application/json' },
-      safetySettings: ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT'].map(category => ({ category, threshold: 'BLOCK_ONLY_HIGH' })),
-      systemInstruction: { parts: [{ text: 'You answer in JSON.' }] },
-    });
-    log('json + safety + system', true, short(textOf(raw)));
-  } catch (e) {
-    log('json + safety + system', false, e.message);
-  }
-  try {
-    const raw = await gen('gemini-2.5-flash', { contents: [{ role: 'user', parts: [{ text: 'Count from 1 to 30, one number per line.' }] }] }, 'streamGenerateContent');
-    const chunks = raw.split('\n').filter(l => l.startsWith('data:')).length;
-    log('stream (sse)', chunks > 0, `${chunks} chunks, ${raw.length} bytes`);
-  } catch (e) {
-    log('stream (sse)', false, e.message);
-  }
-  try {
-    const raw = await gen('gemini-2.5-flash', { contents: [{ role: 'user', parts: [{ inline_data: { mime_type: 'image/png', data: PNG } }, { text: 'What color is this square? One word.' }] }] });
-    log('image input', true, short(textOf(raw)));
-  } catch (e) {
-    log('image input', false, e.message);
-  }
-  try {
-    const big = 'lorem ipsum '.repeat(20000); // ~240 KB prompt, the game's prompts run 20-200 KB
-    const raw = await gen('gemini-2.5-flash', { contents: [{ role: 'user', parts: [{ text: big + '\nReply with the single word ok.' }] }] });
-    log('240 KB prompt', true, short(textOf(raw)));
-  } catch (e) {
-    log('240 KB prompt', false, e.message);
-  }
-
-  // loading the game from outside: a script from a CDN, a file from the guide site
-  try {
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js';
-      s.onload = res;
-      s.onerror = () => rej(new Error('blocked or failed'));
-      document.head.append(s);
-    });
-    log('external script (jsdelivr)', true);
-  } catch (e) {
-    log('external script (jsdelivr)', false, e.message);
-  }
-  try {
-    const r = await fetch('https://wonjoonseol-ws.github.io/dice-roguelife/images/play-en.png');
-    log('fetch from GitHub Pages', r.ok, `HTTP ${r.status}, ${(await r.blob()).size} bytes`);
-  } catch (e) {
-    log('fetch from GitHub Pages', false, e.message);
-  }
-
-  // what survives a reload
-  for (const [name, store] of [['localStorage', localStorage], ['sessionStorage', sessionStorage]]) {
-    try {
-      const prev = store.getItem('dr-probe');
-      store.setItem('dr-probe', new Date().toISOString());
-      log(name, true, `previous value: ${prev || 'none'}`);
-    } catch (e) {
-      log(name, false, e.message);
-    }
-  }
-  try {
-    const db = await new Promise((res, rej) => {
-      const q = indexedDB.open('dr-probe', 1);
-      q.onupgradeneeded = () => q.result.createObjectStore('kv');
-      q.onsuccess = () => res(q.result);
-      q.onerror = () => rej(q.error);
-    });
-    const tx = st => db.transaction('kv', st).objectStore('kv');
-    const prev = await new Promise(res => {
-      const g = tx('readonly').get('t');
-      g.onsuccess = () => res(g.result);
-      g.onerror = () => res(undefined);
-    });
-    tx('readwrite').put(new Date().toISOString(), 't');
-    log('indexedDB', true, `previous value: ${prev || 'none'}`);
-  } catch (e) {
-    log('indexedDB', false, e.message);
-  }
-
-  // the Canvas database (Firestore), if the app was given one
-  try {
-    if (typeof __firebase_config === 'undefined') throw new Error('no __firebase_config (ask Gemini to make the app save data across sessions, then run again)');
-    const v = '11.6.1';
-    const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`);
-    const { getAuth, signInAnonymously, signInWithCustomToken } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-auth.js`);
-    const { getFirestore, doc, getDoc, setDoc } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-firestore.js`);
-    const app = initializeApp(JSON.parse(__firebase_config));
-    const auth = getAuth(app);
-    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) await signInWithCustomToken(auth, __initial_auth_token);
-    else await signInAnonymously(auth);
-    const uid = auth.currentUser.uid;
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-    const fs = getFirestore(app);
-    const ref = doc(fs, `artifacts/${appId}/users/${uid}/probe/t`);
-    const prev = await getDoc(ref);
-    await setDoc(ref, { t: new Date().toISOString(), big: 'x'.repeat(200000) });
-    log('firestore (private)', true, `uid=${uid.slice(0, 6)}... previous: ${prev.exists() ? prev.data().t : 'none'}; wrote a 200 KB doc`);
-    const pub = doc(fs, `artifacts/${appId}/public/data/probe/t`);
-    await setDoc(pub, { t: new Date().toISOString() });
-    log('firestore (public)', true, 'wrote');
-    // file storage for pictures, if the app's project has a bucket
-    const cfg = JSON.parse(__firebase_config);
-    log('storage bucket', !!cfg.storageBucket, cfg.storageBucket ? 'present' : 'none in config');
-    if (cfg.storageBucket) {
-      try {
-        const { getStorage, ref: sref, uploadBytes, getDownloadURL } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-storage.js`);
-        const bytes = Uint8Array.from(atob(PNG), c => c.charCodeAt(0));
-        const f = sref(getStorage(app), `artifacts/${appId}/users/${uid}/probe.png`);
-        await uploadBytes(f, new Blob([bytes], { type: 'image/png' }));
-        log('storage upload', true, short(await getDownloadURL(f)));
-      } catch (e) {
-        log('storage upload', false, e.message);
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Canvas probe</title>
+    <style>
+      body {
+        font:
+          14px/1.5 system-ui,
+          sans-serif;
+        margin: 16px;
+        background: #111;
+        color: #eee;
       }
-    }
-  } catch (e) {
-    log('firestore', false, e.message);
-  }
-  log('DONE', true);
-}
-document.getElementById('run').onclick = run;
-document.getElementById('copy').onclick = async () => {
-  try {
-    await navigator.clipboard.writeText(lines.join('\n'));
-  } catch {
-    getSelection().selectAllChildren(out);
-  }
-};
-</script>
-</body>
+      button {
+        font: inherit;
+        padding: 8px 14px;
+        margin: 0 8px 8px 0;
+        border-radius: 8px;
+        border: 1px solid #555;
+        background: #222;
+        color: #eee;
+      }
+      pre {
+        white-space: pre-wrap;
+        background: #000;
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      .ok {
+        color: #7f7;
+      }
+      .bad {
+        color: #f77;
+      }
+    </style>
+  </head>
+  <body>
+    <h3>Dice Roguelife: Canvas probe</h3>
+    <p>
+      Press <b>Run all</b>, wait until it says DONE, then <b>Copy results</b> and paste them back to Claude. Then reload
+      this app once and press Run all again (that checks what was kept).
+    </p>
+    <button id="run">Run all</button><button id="copy">Copy results</button>
+    <pre id="out"></pre>
+    <script type="module">
+      const out = document.getElementById('out');
+      const lines = [];
+      const log = (name, ok, detail = '') => {
+        lines.push(`${ok ? 'OK  ' : 'FAIL'} ${name}${detail ? ': ' + detail : ''}`);
+        out.textContent = lines.join('\n');
+      };
+      const short = v =>
+        String(typeof v === 'string' ? v : JSON.stringify(v))
+          .replace(/\s+/g, ' ')
+          .slice(0, 240);
+      const API = 'https://generativelanguage.googleapis.com/v1beta/models/';
+      const apiKey = ''; // Canvas supplies the key
+      const PNG = (() => {
+        const c = document.createElement('canvas');
+        c.width = c.height = 8;
+        const x = c.getContext('2d');
+        x.fillStyle = '#f00';
+        x.fillRect(0, 0, 8, 8);
+        return c.toDataURL('image/png').split(',')[1];
+      })(); // an 8x8 red square
+
+      async function gen(model, body, method = 'generateContent') {
+        const r = await fetch(
+          `${API}${model}:${method}?key=${apiKey}${method === 'streamGenerateContent' ? '&alt=sse' : ''}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+        );
+        const text = await r.text();
+        if (!r.ok) throw new Error(`HTTP ${r.status} ${short(text)}`);
+        return text;
+      }
+      const textOf = raw => {
+        try {
+          const j = JSON.parse(raw);
+          return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('');
+        } catch {
+          return raw;
+        }
+      };
+
+      async function run() {
+        lines.length = 0;
+        log('page', true, `origin=${location.origin} ua=${navigator.userAgent.slice(0, 60)}`);
+        log(
+          'globals',
+          true,
+          `__app_id=${typeof __app_id !== 'undefined' ? __app_id : '-'} __firebase_config=${typeof __firebase_config !== 'undefined' ? 'present' : '-'} __initial_auth_token=${typeof __initial_auth_token !== 'undefined' ? 'present' : '-'}`,
+        );
+
+        for (const model of ['gemini-2.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']) {
+          try {
+            const t0 = performance.now();
+            const raw = await gen(model, {
+              contents: [{ role: 'user', parts: [{ text: 'Reply with the single word ok.' }] }],
+            });
+            log(`model ${model}`, true, `${Math.round(performance.now() - t0)}ms "${short(textOf(raw))}"`);
+          } catch (e) {
+            log(`model ${model}`, false, e.message);
+          }
+        }
+        try {
+          const raw = await gen('gemini-2.5-flash', {
+            contents: [{ role: 'user', parts: [{ text: 'Return {"a":1,"b":"two"} as JSON.' }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+            safetySettings: [
+              'HARM_CATEGORY_HARASSMENT',
+              'HARM_CATEGORY_HATE_SPEECH',
+              'HARM_CATEGORY_SEXUALLY_EXPLICIT',
+              'HARM_CATEGORY_DANGEROUS_CONTENT',
+            ].map(category => ({ category, threshold: 'BLOCK_ONLY_HIGH' })),
+            systemInstruction: { parts: [{ text: 'You answer in JSON.' }] },
+          });
+          log('json + safety + system', true, short(textOf(raw)));
+        } catch (e) {
+          log('json + safety + system', false, e.message);
+        }
+        try {
+          const raw = await gen(
+            'gemini-2.5-flash',
+            { contents: [{ role: 'user', parts: [{ text: 'Count from 1 to 30, one number per line.' }] }] },
+            'streamGenerateContent',
+          );
+          const chunks = raw.split('\n').filter(l => l.startsWith('data:')).length;
+          log('stream (sse)', chunks > 0, `${chunks} chunks, ${raw.length} bytes`);
+        } catch (e) {
+          log('stream (sse)', false, e.message);
+        }
+        try {
+          const raw = await gen('gemini-2.5-flash', {
+            contents: [
+              {
+                role: 'user',
+                parts: [
+                  { inline_data: { mime_type: 'image/png', data: PNG } },
+                  { text: 'What color is this square? One word.' },
+                ],
+              },
+            ],
+          });
+          log('image input', true, short(textOf(raw)));
+        } catch (e) {
+          log('image input', false, e.message);
+        }
+        try {
+          const big = 'lorem ipsum '.repeat(20000); // ~240 KB prompt, the game's prompts run 20-200 KB
+          const raw = await gen('gemini-2.5-flash', {
+            contents: [{ role: 'user', parts: [{ text: big + '\nReply with the single word ok.' }] }],
+          });
+          log('240 KB prompt', true, short(textOf(raw)));
+        } catch (e) {
+          log('240 KB prompt', false, e.message);
+        }
+
+        // loading the game from outside: a script from a CDN, a file from the guide site
+        try {
+          await new Promise((res, rej) => {
+            const s = document.createElement('script');
+            s.src = 'https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js';
+            s.onload = res;
+            s.onerror = () => rej(new Error('blocked or failed'));
+            document.head.append(s);
+          });
+          log('external script (jsdelivr)', true);
+        } catch (e) {
+          log('external script (jsdelivr)', false, e.message);
+        }
+        try {
+          const r = await fetch('https://wonjoonseol-ws.github.io/dice-roguelife/images/play-en.png');
+          log('fetch from GitHub Pages', r.ok, `HTTP ${r.status}, ${(await r.blob()).size} bytes`);
+        } catch (e) {
+          log('fetch from GitHub Pages', false, e.message);
+        }
+
+        // what survives a reload
+        for (const [name, store] of [
+          ['localStorage', localStorage],
+          ['sessionStorage', sessionStorage],
+        ]) {
+          try {
+            const prev = store.getItem('dr-probe');
+            store.setItem('dr-probe', new Date().toISOString());
+            log(name, true, `previous value: ${prev || 'none'}`);
+          } catch (e) {
+            log(name, false, e.message);
+          }
+        }
+        try {
+          const db = await new Promise((res, rej) => {
+            const q = indexedDB.open('dr-probe', 1);
+            q.onupgradeneeded = () => q.result.createObjectStore('kv');
+            q.onsuccess = () => res(q.result);
+            q.onerror = () => rej(q.error);
+          });
+          const tx = st => db.transaction('kv', st).objectStore('kv');
+          const prev = await new Promise(res => {
+            const g = tx('readonly').get('t');
+            g.onsuccess = () => res(g.result);
+            g.onerror = () => res(undefined);
+          });
+          tx('readwrite').put(new Date().toISOString(), 't');
+          log('indexedDB', true, `previous value: ${prev || 'none'}`);
+        } catch (e) {
+          log('indexedDB', false, e.message);
+        }
+
+        // the Canvas database (Firestore), if the app was given one
+        try {
+          if (typeof __firebase_config === 'undefined')
+            throw new Error(
+              'no __firebase_config (ask Gemini to make the app save data across sessions, then run again)',
+            );
+          const v = '11.6.1';
+          const { initializeApp } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-app.js`);
+          const { getAuth, signInAnonymously, signInWithCustomToken } = await import(
+            `https://www.gstatic.com/firebasejs/${v}/firebase-auth.js`
+          );
+          const { getFirestore, doc, getDoc, setDoc } = await import(
+            `https://www.gstatic.com/firebasejs/${v}/firebase-firestore.js`
+          );
+          const app = initializeApp(JSON.parse(__firebase_config));
+          const auth = getAuth(app);
+          if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token)
+            await signInWithCustomToken(auth, __initial_auth_token);
+          else await signInAnonymously(auth);
+          const uid = auth.currentUser.uid;
+          const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+          const fs = getFirestore(app);
+          const ref = doc(fs, `artifacts/${appId}/users/${uid}/probe/t`);
+          const prev = await getDoc(ref);
+          await setDoc(ref, { t: new Date().toISOString(), big: 'x'.repeat(200000) });
+          log(
+            'firestore (private)',
+            true,
+            `uid=${uid.slice(0, 6)}... previous: ${prev.exists() ? prev.data().t : 'none'}; wrote a 200 KB doc`,
+          );
+          const pub = doc(fs, `artifacts/${appId}/public/data/probe/t`);
+          await setDoc(pub, { t: new Date().toISOString() });
+          log('firestore (public)', true, 'wrote');
+          // file storage for pictures, if the app's project has a bucket
+          const cfg = JSON.parse(__firebase_config);
+          log('storage bucket', !!cfg.storageBucket, cfg.storageBucket ? 'present' : 'none in config');
+          if (cfg.storageBucket) {
+            try {
+              const {
+                getStorage,
+                ref: sref,
+                uploadBytes,
+                getDownloadURL,
+              } = await import(`https://www.gstatic.com/firebasejs/${v}/firebase-storage.js`);
+              const bytes = Uint8Array.from(atob(PNG), c => c.charCodeAt(0));
+              const f = sref(getStorage(app), `artifacts/${appId}/users/${uid}/probe.png`);
+              await uploadBytes(f, new Blob([bytes], { type: 'image/png' }));
+              log('storage upload', true, short(await getDownloadURL(f)));
+            } catch (e) {
+              log('storage upload', false, e.message);
+            }
+          }
+        } catch (e) {
+          log('firestore', false, e.message);
+        }
+        log('DONE', true);
+      }
+      document.getElementById('run').onclick = run;
+      document.getElementById('copy').onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(lines.join('\n'));
+        } catch {
+          getSelection().selectAllChildren(out);
+        }
+      };
+    </script>
+  </body>
 </html>

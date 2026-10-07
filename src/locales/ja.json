@@ -1051,5 +1051,7 @@
   "Read": "既読",
   "Story language (this save)": "物語の言語（このセーブ）",
   "Story language for new games": "新しいゲームの物語の言語",
-  "Saved. This save continues in it from the next turn; earlier turns stay as written": "保存しました。このセーブは次のターンからこの言語で続きます。これまでのターンはそのままです"
+  "Saved. This save continues in it from the next turn; earlier turns stay as written": "保存しました。このセーブは次のターンからこの言語で続きます。これまでのターンはそのままです",
+  "Community board, always in Reddit style": "コミュニティ掲示板（常にReddit風）",
+  "Community board, always in 5ch style": "コミュニティ掲示板（常に5ch風）"
 }

@@ -524,7 +524,7 @@ const LOG_ACTIONS = {
   reroll: () => rerollWithReason(),
   fork: b => fork(+b.dataset.fork),
   accept: b => acceptQuest(b),
-  open: b => send(`${cmdName('board')} ${T('open "{title}"', { title: b.dataset.open })}`),
+  open: b => send(`${b.dataset.via || cmdName('board')} ${T('open "{title}"', { title: b.dataset.open })}`),
   hall: b => shareToHall(+b.dataset.hall),
   card: b => {
     const t = app.turns.find(x => x.i === +b.dataset.card);

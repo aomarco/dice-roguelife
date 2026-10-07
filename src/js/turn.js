@@ -326,6 +326,7 @@ async function narrate(text, cmd, intro, turn) {
   setSendMode(null);
   if (cmd && cmd.type === 'judge' && (await objectionHandled(out, cmd, text))) return;
   maskReply(out, cmd, turn);
+  if (cmd && cmd.look && out.widget) out.widget.look = cmd.look; // /reddit: this board keeps that look whatever the setting
   await settleDice(turn, out);
   aliasOut(out);
   await earlyCast(out);

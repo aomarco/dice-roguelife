@@ -48,6 +48,40 @@ for (const [locale, board, chat] of [
     expect(errs).toEqual([]);
   });
 
+test('/reddit shows a Reddit board in any story language, and its posts open through /reddit', async ({ game }) => {
+  const { pg, errs } = await game(claudeMock(reply));
+  await pg.waitForSelector('#rollBtn');
+  await startLife(pg, { name: 'Jin' });
+  await pg.evaluate(x => (window.__W = x), BOARD);
+  await pg.evaluate(() => DR.send('/reddit'));
+  await pg.waitForFunction(() => DR.app.turns.at(-1).out?.widget?.type === 'gallery');
+  const cls = await pg.evaluate(() => [...document.querySelectorAll('#log .w')].pop().className);
+  check(errs, `a Korean story's /reddit board is Reddit: ${cls}`, cls === 'w w-gal g-reddit');
+  check(
+    errs,
+    'the look is kept with the reply',
+    (await pg.evaluate('DR.app.turns.at(-1).out.widget.look')) === 'reddit',
+  );
+  await pg.evaluate(() => DR.send('/갤'));
+  await pg.waitForFunction(() => DR.app.turns.filter(t => t.out?.widget).length === 2);
+  const classes = await pg.evaluate(() => [...document.querySelectorAll('#log .w')].map(w => w.className));
+  check(
+    errs,
+    `/갤 stays DC, the earlier board stays Reddit: ${classes}`,
+    classes.join() === 'w w-gal g-reddit,w w-gal',
+  );
+  const via = await pg.evaluate(() => document.querySelector('#log .g-reddit [data-open]').dataset.via);
+  check(errs, `a Reddit board's post opens through /레딧 or /reddit: ${via}`, via === '/레딧');
+  await pg.evaluate(() => DR.send('/5ch'));
+  await pg.waitForFunction(() => DR.app.turns.filter(t => t.out?.widget).length === 3);
+  const last = await pg.evaluate(() => {
+    const w = [...document.querySelectorAll('#log .w')].pop();
+    return [w.className, w.querySelector('[data-open]').dataset.via];
+  });
+  check(errs, `/5ch is a 5ch board that opens through /5ch: ${last}`, last.join() === 'w w-gal g-5ch,/5ch');
+  expect(errs).toEqual([]);
+});
+
 test('a picked style wins over the story language, and every style draws the posts and the thread', async ({
   game,
 }) => {

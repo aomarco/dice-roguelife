@@ -347,6 +347,22 @@ export const CMDS = [
   { id: 'quest', k: '/의뢰', a: ['/quest', '/q'], t: 'quest', d: N_('Quest board') },
   { id: 'board', k: '/갤', a: ['/board', '/gallery', '/dc'], t: 'gallery', d: N_('Community board') },
   {
+    id: 'reddit',
+    k: '/레딧',
+    a: ['/reddit'],
+    t: 'gallery',
+    look: 'reddit',
+    d: N_('Community board, always in Reddit style'),
+  },
+  {
+    id: '5ch',
+    k: '/5ch',
+    a: ['/5ch'],
+    t: 'gallery',
+    look: '5ch',
+    d: N_('Community board, always in 5ch style'),
+  },
+  {
     id: 'star',
     k: '/성좌',
     a: ['/star', '/성좌갤'],

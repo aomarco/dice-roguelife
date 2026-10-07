@@ -9,7 +9,7 @@ import { esc } from './util.js';
 import { mentionsStars } from './reply-words.js';
 import { app } from './app.js';
 import { setting, widgetStyle } from './settings.js';
-import { cmdName } from './data.js';
+import { CMDS, cmdName } from './data.js';
 import { locale, N_, T, Tc } from './i18n.js';
 
 function stars(n) {
@@ -61,9 +61,10 @@ const posterId = s => {
 };
 const avatar = name =>
   `<span class="av" style="background:hsl(${hash(name) % 360} 45% 52%)">${esc(first(name))}</span>`;
+// opening a post goes back through the command this board came from, so it keeps its board and look
 const postList = (w, item) =>
   w.posts && w.posts.length
-    ? `<ul>${w.posts.map((x, i) => `<li><button data-open="${esc(x.title)}">${item(x, i)}</button></li>`).join('')}</ul>`
+    ? `<ul>${w.posts.map((x, i) => `<li><button data-open="${esc(x.title)}" data-via="${esc(boardCmd(w))}">${item(x, i)}</button></li>`).join('')}</ul>`
     : '';
 
 function dcHtml(w, p, anon) {
@@ -118,7 +119,7 @@ function nicoHtml(w, p, anon) {
     }</div>`;
 }
 const BOARDS = { dc: dcHtml, reddit: redditHtml, '5ch': chHtml, nico: nicoHtml };
-const galleryHtml = w => (BOARDS[widgetStyle('boardStyle')] || dcHtml)(w, w.post, T('Anon'));
+const galleryHtml = w => (BOARDS[w.look] || BOARDS[widgetStyle('boardStyle')] || dcHtml)(w, w.post, T('Anon'));
 
 const msgs = (w, one) => (w.messages || []).map(one).join('');
 const CHATS = {
@@ -132,6 +133,10 @@ const CHATS = {
 const messengerHtml = w => (CHATS[widgetStyle('chatStyle')] || CHATS.kakao)(w);
 // a constellation board (the /성좌 command) is a gallery whose site or board names the constellations
 const isStarBoard = w => mentionsStars((w.site || '') + (w.board || ''));
+const boardCmd = w => {
+  const own = w.look && CMDS.find(c => c.look === w.look); // /reddit, /5ch
+  return cmdName(own ? own.id : isStarBoard(w) ? 'star' : 'board');
+};
 
 export const WIDGETS = {
   news: {
@@ -152,7 +157,7 @@ export const WIDGETS = {
     label: N_('Board'),
     render: galleryHtml,
     followups: w => {
-      const base = cmdName(isStarBoard(w) ? 'star' : 'board');
+      const base = boardCmd(w);
       return [
         ...(w.post ? [[`${base} ${T('back to the list')}`, T('Back to list')]] : []),
         [`${base} ${T('show me other posts too')}`, T('Other posts')],
