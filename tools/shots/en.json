@@ -10,7 +10,8 @@
     "board": "/board",
     "news": "/news",
     "quest": "/quest",
-    "star": "/star"
+    "star": "/star",
+    "hero": "Look for someone to buy my map"
   },
   "free": {
     "origin": "Night-shift convenience store clerk",
@@ -33,9 +34,16 @@
     "weather": "Cloudy, cold wind",
     "place": "Back alley, nightlife district",
     "gold": 65000,
-    "skill": { "name": "Knack", "grade": "C", "desc": "Good at cooking and cleaning" },
+    "skill": {
+      "name": "Knack",
+      "grade": "C",
+      "desc": "Good at cooking and cleaning"
+    },
     "quests": [
-      { "title": "Tomorrow's quota: 6", "note": "One wallet confiscated, one in hand. Five hours until dawn." },
+      {
+        "title": "Tomorrow's quota: 6",
+        "note": "One wallet confiscated, one in hand. Five hours until dawn."
+      },
       {
         "title": "Raise 150,000 won for the test",
         "note": "A private testing center would take 100,000. 38,000 so far. Not happening tonight."
@@ -53,15 +61,32 @@
         "Head deeper into the alley (success chance 35%)",
         "Run for it"
       ],
-      "stat_changes": { "hp": -2, "power": 1 },
+      "stat_changes": {
+        "hp": -2,
+        "power": 1
+      },
       "title": "Alley Survivor",
       "title_effect": "+3 to crisis checks",
       "memory": {
-        "lore": [{ "key": "Sewer rat", "text": "Very interested in your shoelaces" }],
+        "lore": [
+          {
+            "key": "Sewer rat",
+            "text": "Very interested in your shoelaces"
+          }
+        ],
         "relations": [
-          { "name": "Daesung Mobile boss", "note": "Runs the phone shop in the alley. Generous to regulars" },
-          { "name": "Daesung Mobile owner", "note": "Owns the phone shop on the corner. Gave you a discount once" },
-          { "name": "Seoyun", "note": "Childhood friend. Acts cold on the outside" }
+          {
+            "name": "Daesung Mobile boss",
+            "note": "Runs the phone shop in the alley. Generous to regulars"
+          },
+          {
+            "name": "Daesung Mobile owner",
+            "note": "Owns the phone shop on the corner. Gave you a discount once"
+          },
+          {
+            "name": "Seoyun",
+            "note": "Childhood friend. Acts cold on the outside"
+          }
         ],
         "state_note": "A rainy alley",
         "quests": []
@@ -79,7 +104,10 @@
     },
     "judge": {
       "narration": "Chasing off one rat with a broom was set at a 60% chance. The dice decided the rest, and the wet ground made it into the story.",
-      "objection": { "upheld": false, "no_check": false }
+      "objection": {
+        "upheld": false,
+        "no_check": false
+      }
     },
     "nodice": {
       "admin": "The dice have the day off. Plausibility is working overtime instead.",
@@ -94,9 +122,19 @@
         "app": "Chirp",
         "room": "Hunter party",
         "messages": [
-          { "from": "Me", "text": "Ramen tonight?", "me": true },
-          { "from": "Leon", "text": "Sure. Front gate at 7" },
-          { "from": "Mia", "text": "I'm in! I'll save us a table" }
+          {
+            "from": "Me",
+            "text": "Ramen tonight?",
+            "me": true
+          },
+          {
+            "from": "Leon",
+            "text": "Sure. Front gate at 7"
+          },
+          {
+            "from": "Mia",
+            "text": "I'm in! I'll save us a table"
+          }
         ]
       }
     },
@@ -115,7 +153,13 @@
             "likes": 412,
             "comments": 336
           },
-          { "title": "How does a gate open at a HOSPITAL", "author": "", "views": 9021, "likes": 188, "comments": 97 },
+          {
+            "title": "How does a gate open at a HOSPITAL",
+            "author": "",
+            "views": 9021,
+            "likes": 188,
+            "comments": 97
+          },
           {
             "title": "Association ETA 17 minutes... 17???",
             "author": "awakened5yrs",
@@ -214,7 +258,13 @@
             "likes": 412,
             "comments": 336
           },
-          { "title": "How does a gate open at a HOSPITAL", "author": "", "views": 9021, "likes": 188, "comments": 97 },
+          {
+            "title": "How does a gate open at a HOSPITAL",
+            "author": "",
+            "views": 9021,
+            "likes": 188,
+            "comments": 97
+          },
           {
             "title": "Association ETA 17 minutes... 17???",
             "author": "awakened5yrs",
@@ -263,11 +313,109 @@
               "author": "awakened5yrs",
               "text": "The first five minutes of a surprise C-rank are the worst. Don't go down. Always up."
             },
-            { "author": "", "text": "^ this. if the rift is on the lot it floods from the basement up", "reply": true },
-            { "author": "ratwatcher", "text": "is the convenience store guy across the street ok" }
+            {
+              "author": "",
+              "text": "^ this. if the rift is on the lot it floods from the basement up",
+              "reply": true
+            },
+            {
+              "author": "ratwatcher",
+              "text": "is the convenience store guy across the street ok"
+            }
           ]
         }
       }
+    },
+    "hero1": {
+      "admin": "Viewing tip: a twelve-year-old is about to haggle with a licensed hunter. I've cancelled my other plans.",
+      "narration": "The gate over Mangwon station hums like a fridge left open. Under the flickering convenience store sign, a hunter in a long coat wipes her rapier with one hand and counts monster cores with the other.\n[[Mira]]\n\"You're the kid selling maps of the sewer gates?\" She doesn't look up. \"Show me one that's real and I'll pay double. Show me a fake and you're bait.\"",
+      "speaker": "Mira",
+      "speaker_gender": "female",
+      "speaker_role": "hunter",
+      "speaker_weight": "major",
+      "emotion": "smirk",
+      "system": ["[ Quest offered: The Real Map ]"],
+      "choices": [
+        "Unfold the map you drew last night (success chance 55%)",
+        "Raise the price before showing anything (success chance 30%)",
+        "Ask what she is hunting"
+      ],
+      "memory": {
+        "relations": [
+          {
+            "name": "Mira",
+            "note": "A licensed hunter. Pays well, threatens better"
+          }
+        ],
+        "quests": [
+          {
+            "title": "The Real Map",
+            "status": "active",
+            "note": "Show Mira a real sewer gate map"
+          }
+        ]
+      }
+    },
+    "hero2": {
+      "admin": "Twenty-three. The dice like you today. Don't get used to it.",
+      "narration": "You unfold the map against the shutter. Mira's eyes follow your pencil line down the storm drain, past the pumping station, to the X you drew in red.\n\nShe goes quiet. Then she laughs, short and surprised.\n\n\"C-3. Nobody has logged that entrance.\" She presses two cores and a folded bill into your hand. \"Stay off the street tonight. Word travels.\"",
+      "system": ["[ Title acquired: Sewer Cartographer ]"],
+      "title": "Sewer Cartographer",
+      "title_effect": "+10% when selling information",
+      "stat_changes": {
+        "gold": 60000,
+        "fame": 5
+      },
+      "choices": [
+        "Count the money in the alley",
+        "Follow Mira at a distance (success chance 40%)",
+        "Go home and draw more maps"
+      ],
+      "memory": {
+        "quests": [
+          {
+            "title": "The Real Map",
+            "status": "done"
+          }
+        ]
+      }
+    },
+    "hero3": {
+      "admin": "Told you. Word travels.",
+      "narration": "Your phone buzzes before you reach the corner. Someone has already posted.",
+      "widget": {
+        "type": "gallery",
+        "site": "GateWatch",
+        "board": "Seoul gates",
+        "posts": [
+          {
+            "title": "A kid near Mangwon station sells sewer gate maps and they are ACCURATE",
+            "author": "core_runner",
+            "views": 18400,
+            "likes": 932,
+            "comments": 211
+          },
+          {
+            "title": "Gate C-3 was exactly where the red X was. I am scared of a 12-year-old",
+            "author": "eastside_9",
+            "views": 9620,
+            "likes": 515,
+            "comments": 97
+          },
+          {
+            "title": "Association statement: 'We do not endorse child cartographers'",
+            "author": "press_bot",
+            "views": 22100,
+            "likes": 640,
+            "comments": 388
+          }
+        ]
+      },
+      "choices": [
+        "Reply to the thread as the mapmaker (success chance 35%)",
+        "Sell three more maps before dawn (success chance 50%)",
+        "Lie low tonight"
+      ]
     }
   }
 }

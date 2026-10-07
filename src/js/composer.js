@@ -1,13 +1,12 @@
 /* ============ composer & slash menu ============ */
 import { $, toast } from './util.js';
-import { cmdName, CMDS } from './data.js';
+import { allCmdNames, cmdName, cmdNames, CMDS } from './data.js';
 import { app } from './app.js';
 import { openStatus } from './status.js';
 import { inputPh } from './log.js';
-import { isKo, N_, T } from './i18n.js';
+import { N_, T } from './i18n.js';
 import { pl } from './prompt.js';
 
-const HANGUL = /[가-힣]/; // Korean command names work everywhere but are listed only on a Korean screen
 import { openSettingsSheet } from './settings-sheet.js';
 import { send } from './turn.js';
 
@@ -151,7 +150,7 @@ function slashMenu() {
     return;
   }
   const lv = v.toLowerCase();
-  const m = CMDS.filter(c => [c.k, ...(c.a || [])].some(k => k.startsWith(lv)));
+  const m = CMDS.filter(c => allCmdNames(c).some(k => k.startsWith(lv)));
   if (!m.length) {
     box.classList.add('hidden');
     return;
@@ -159,7 +158,7 @@ function slashMenu() {
   box.innerHTML = m
     .map(
       c =>
-        `<button type="button" data-id="${c.id}"><code>${cmdName(c.id)}</code><span class="muted">${T(c.d)} <span class="cmd-alias">${[c.k, ...(c.a || [])].filter(k => k !== cmdName(c.id) && (isKo() || !HANGUL.test(k))).join(' ')}</span></span></button>`,
+        `<button type="button" data-id="${c.id}"><code>${cmdName(c.id)}</code><span class="muted">${T(c.d)} <span class="cmd-alias">${cmdNames(c).slice(1).join(' ')}</span></span></button>`,
     )
     .join('');
   box.classList.remove('hidden');
@@ -177,17 +176,11 @@ function slashMenu() {
         input.focus();
       }),
   );
-  if (m.length && !m.find(c => c.k === v || (c.a || []).includes(lv))) {
-    const c = m[0];
-    if (v.length > 1 && (c.a || []).some(k => k === lv)) {
-      box.classList.add('hidden');
-    }
-  }
 }
 export function parseCmd(text) {
   const t = text.trim();
   for (const c of CMDS)
-    for (const k of [c.k, ...(c.a || [])]) {
+    for (const k of allCmdNames(c)) {
       if (t.toLowerCase() === k || t.toLowerCase().startsWith(k + ' '))
         return {
           type: c.t,

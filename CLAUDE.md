@@ -24,6 +24,9 @@ English is the source language. Each other language is a JSON map keyed by the E
   block tells the narrator to answer in the story language and how to render other languages' speech. A new life stores world, race, origin and talent in the story language (`worldIn`, `tIn`).
   Prompts: a Korean story reads `prompts.json`; English and Japanese stories read `prompts.en` (`pr(key)`), and
   Japanese adds `prompts.lang.ja`.
+- Slash commands: `CMDS` (`data.js`) holds the English names, which work in every language. A language's own names
+  are catalog entries `"<first English name>|command": "/뉴스"` (several space separated, the first is shown); the
+  screen lists its own names, else the English ones, and every language's names work when typed.
 - Stored or compared values are enums (`src/js/enums.js`), never words. Labels are `N_()` maps shown with `T()`.
   Korean values in old saves map through `LEGACY` in `compat.js`.
 - What the code reads in narrator replies (odds tags, dates, times, system-line words) is a per-language profile of

@@ -1,6 +1,6 @@
 // Screenshots for the guide site, one language per run: docs/images/<name>-<lang>.png
 //   node tools/shots.js en              every shot
-//   node tools/shots.js ja play extra   some groups (new, play, misc, desk, images, styles, promo, extra)
+//   node tools/shots.js ja play extra   some groups (new, play, misc, desk, images, styles, promo, hero, extra)
 // The story in the shots is fake (tools/shots/<lang>.json) and the faces are drawn placeholders. The image-tab shots
 // can show real art instead: DR_SHOT_ART=<folder> with <id>.webp files named as in ART below.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
@@ -15,7 +15,7 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const LOCALES = { ko: 'ko-KR', en: 'en-US', ja: 'ja-JP' };
 const [lang, ...only] = process.argv.slice(2);
 if (!LOCALES[lang]) {
-  console.log('usage: node tools/shots.js <ko|en|ja> [new play misc desk images styles promo extra]');
+  console.log('usage: node tools/shots.js <ko|en|ja> [new play misc desk images styles promo hero extra]');
   process.exit(1);
 }
 const S = JSON.parse(readFileSync(join(ROOT, 'tools', 'shots', `${lang}.json`), 'utf8'));
@@ -87,6 +87,13 @@ for (const n of ['dice', 'dice_success', 'dice_fail']) {
   PICS[n] = scene(0.5);
   ROWS.push({ id: n, kind: 'fx', name: n, file: n + '.png', tags: ['dice'] });
 }
+// the hero shot's hunter and gate (real art with DR_SHOT_ART)
+const HERO_ROWS = [
+  { id: 'hunter1_smirk', kind: 'char', name: 'hunter1_smirk', set: 'hunter1', emotion: 'smirk', tags: ['hunter'] },
+  { id: 'bg_gate-portal_night', kind: 'scene', name: 'gate-portal_night', tags: ['gate', 'city', 'night'] },
+];
+PICS.hunter1_smirk = face(0.9, 'smile');
+PICS['bg_gate-portal_night'] = scene(0.7);
 const SETS = {
   female1: {
     gender: 'female',
@@ -114,6 +121,8 @@ const ART = {
   male1_smile: '8b63df231e1687434bd648caf07cb01e',
   female2_neutral: '463a0be72364ff3f5c8bdbbd82e9971c',
   female2_smirk: '4a42ecf93d63543ec10fc2f586a2588e',
+  hunter1_smirk: '18824610c4ab7e8e219c70dc3bd3895c',
+  'bg_gate-portal_night': '56f16c5fde20f9c82b03b5f00e5e7e3c',
 };
 const ART_DIR = process.env.DR_SHOT_ART;
 const REAL = {};
@@ -559,6 +568,58 @@ const GROUPS = {
     await fromCommand('promo-board');
     await say(pg, S.inputs.chat, 'messenger', 1500);
     await fromCommand('promo-chat');
+    await ctx.close();
+  },
+
+  // One tall phone screen that tells the game in three beats: an offer with odds, the d100 deciding it, and the
+  // forum reacting. English only (tools/shots/en.json replies hero1-3); saved as JPEG, since real art bands at 256 colors.
+  async hero(browser) {
+    if (!S.replies.hero1) return console.log('  (no hero scene for this language)');
+    const ctx = await browser.newContext({
+      locale: LOCALES[lang],
+      viewport: { width: 420, height: 900 },
+      deviceScaleFactor: 2,
+    });
+    const pg = await ctx.newPage();
+    await pg.addInitScript(MOCK);
+    await pg.goto(PAGE);
+    await pg.waitForSelector('#rollBtn');
+    await seed(pg);
+    await begin(pg);
+    await seedImages(pg, true);
+    await pg.evaluate(rows => DR.app.images.push(...rows), HERO_ROWS);
+    await say(pg, S.inputs.hero, 'hero1', 1500);
+    await pg.evaluate(async () => {
+      const t = DR.app.turns.at(-1);
+      t.img = {
+        scene: 'bg_gate-portal_night',
+        char: 'hunter1_smirk',
+        chars: [{ id: 'hunter1_smirk', npc: t.out.speaker }],
+      };
+      await DR.turnStore.update(t);
+      DR.renderLog('keep');
+    });
+    await pg.evaluate(() => {
+      window.__scn = 'hero2';
+      DR.rnd = () => 0.22; // a 23: the map is real
+    });
+    await pg.click('#log .choices [data-choice]');
+    await wait(pg, 2800);
+    await seed(pg);
+    await say(pg, S.inputs.reddit || '/reddit', 'hero3', 1500);
+    // a viewport tall enough to show everything from the player's first line down, above the input bar
+    const span = await pg.evaluate(() => {
+      const log = document.querySelector('#log');
+      const first = [...log.querySelectorAll('.turn.u')][0];
+      const top = first.getBoundingClientRect().top - log.getBoundingClientRect().top + log.scrollTop;
+      return { top, content: log.scrollHeight - top, chrome: window.innerHeight - log.clientHeight };
+    });
+    await pg.setViewportSize({ width: 420, height: Math.ceil(span.content + span.chrome + 12) });
+    await pg.evaluate(top => (document.querySelector('#log').scrollTop = top - 8), span.top);
+    await wait(pg, 600);
+    await clean(pg);
+    await pg.screenshot({ path: join(ROOT, 'docs', 'images', `promo-hero-${lang}.jpg`), type: 'jpeg', quality: 88 });
+    console.log('  promo-hero');
     await ctx.close();
   },
 

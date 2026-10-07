@@ -1,6 +1,6 @@
 /* ============ data tables (code owns the rules) ============ */
 import { rnd } from './util.js';
-import { isKo, locale, N_, tIn, uiLang } from './i18n.js';
+import { catalogEntry, locale, N_, tIn, UI_LANGS, uiLang } from './i18n.js';
 import { STANCES } from './enums.js';
 
 export const TIERS = ['EX', 'SSS', 'S', 'A', 'B', 'C', 'D', 'E', 'F'];
@@ -340,61 +340,37 @@ export const BASE = {
   E: { hp: 50, power: 10, gold: 0 },
   F: { hp: 10, power: 3, gold: 0 },
 };
-// k: the Korean command, a[0]: the English one; both work when typed, cmdName(id) shows the screen's
-// i18n-ignore-start: command names a Korean player types
+// The English names work in every language. A language's own names are its catalog's '<first English name>|command'
+// entry, space separated (ko.json: "/news|command": "/뉴스"); the screen lists its own names, else the English ones.
 export const CMDS = [
-  { id: 'news', k: '/뉴스', a: ['/news'], t: 'news', d: N_("The world's newspaper") },
-  { id: 'quest', k: '/의뢰', a: ['/quest', '/q'], t: 'quest', d: N_('Quest board') },
-  { id: 'board', k: '/갤', a: ['/board', '/gallery', '/dc'], t: 'gallery', d: N_('Community board') },
-  {
-    id: 'reddit',
-    k: '/레딧',
-    a: ['/reddit'],
-    t: 'gallery',
-    look: 'reddit',
-    d: N_('Community board, always in Reddit style'),
-  },
-  {
-    id: '5ch',
-    k: '/5ch',
-    a: ['/5ch'],
-    t: 'gallery',
-    look: '5ch',
-    d: N_('Community board, always in 5ch style'),
-  },
+  { id: 'news', names: ['/news'], t: 'news', d: N_("The world's newspaper") },
+  { id: 'quest', names: ['/quest', '/q'], t: 'quest', d: N_('Quest board') },
+  { id: 'board', names: ['/board', '/gallery', '/dc'], t: 'gallery', d: N_('Community board') },
+  { id: 'reddit', names: ['/reddit'], t: 'gallery', look: 'reddit', d: N_('Community board, always in Reddit style') },
+  { id: '5ch', names: ['/5ch'], t: 'gallery', look: '5ch', d: N_('Community board, always in 5ch style') },
   {
     id: 'star',
-    k: '/성좌',
-    a: ['/star', '/성좌갤'],
+    names: ['/star'],
     t: 'gallery',
     d: N_("The constellations' viewing gallery (in a life with constellations, after the channel opens)"),
     preset: N_(
       "A constellation gallery. The constellations watching this player's channel (spectators named after star signs) sponsor, mock and place bets in posts and comments. Name the site to suit the world.",
     ),
   },
-  { id: 'chat', k: '/톡', a: ['/chat', '/talk', '/dm'], t: 'messenger', d: N_('Send a message on the messenger') },
-  {
-    id: 'why',
-    k: '/판정',
-    a: ['/why', '/근거'],
-    t: 'judge',
-    d: N_('Ask why a check went the way it did (no time passes)'),
-  },
+  { id: 'chat', names: ['/chat', '/talk', '/dm'], t: 'messenger', d: N_('Send a message on the messenger') },
+  { id: 'why', names: ['/why'], t: 'judge', d: N_('Ask why a check went the way it did (no time passes)') },
   {
     id: 'skill',
-    k: '/스킬',
-    a: ['/skill', '/skills', '/기술'],
+    names: ['/skill', '/skills'],
     t: 'skills',
     d: N_('Hear your skills and their costs from ADMIN (no time passes)'),
   },
-  { id: 'status', k: '/상태', a: ['/status', '/st'], t: 'status', d: N_('Open the status window') },
+  { id: 'status', names: ['/status', '/st'], t: 'status', d: N_('Open the status window') },
 ];
-// i18n-ignore-end
-
-export const cmdName = id => {
-  const c = CMDS.find(x => x.id === id);
-  return isKo() ? c.k : c.a[0];
-};
+const ownNames = (c, lang) => (catalogEntry(lang, c.names[0] + '|command') || '').split(' ').filter(Boolean);
+export const cmdNames = c => (n => (n.length ? n : c.names))(ownNames(c, uiLang()));
+export const allCmdNames = c => [...c.names, ...UI_LANGS.flatMap(l => ownNames(c, l))];
+export const cmdName = id => cmdNames(CMDS.find(x => x.id === id))[0];
 
 export const EMOS = [
   'neutral',

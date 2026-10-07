@@ -1105,5 +1105,14 @@
   "Story language for new games": "새 게임의 이야기 언어",
   "Saved. This save continues in it from the next turn; earlier turns stay as written": "저장됨. 이 저장은 다음 턴부터 이 언어로 이어져요. 지난 턴은 그대로예요",
   "Community board, always in Reddit style": "커뮤니티 게시판 (항상 레딧 스타일)",
-  "Community board, always in 5ch style": "커뮤니티 게시판 (항상 5ch 스타일)"
+  "Community board, always in 5ch style": "커뮤니티 게시판 (항상 5ch 스타일)",
+  "/news|command": "/뉴스",
+  "/quest|command": "/의뢰",
+  "/board|command": "/갤",
+  "/reddit|command": "/레딧",
+  "/star|command": "/성좌 /성좌갤",
+  "/chat|command": "/톡",
+  "/why|command": "/판정 /근거",
+  "/skill|command": "/스킬 /기술",
+  "/status|command": "/상태"
 }

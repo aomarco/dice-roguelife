@@ -29,6 +29,8 @@ export function tIn(lang, en, vars) {
 export function T(en, vars) {
   return tIn(cur, en, vars);
 }
+// one language's entry for a key, or undefined (no English fallback)
+export const catalogEntry = (lang, key) => (CATALOGS[lang] || {})[key];
 // marks text for translation where it is defined; T() translates it where it is shown
 export const N_ = en => en;
 // same English, different meaning in another language: the catalog key is 'en|ctx'

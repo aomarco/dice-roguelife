@@ -140,7 +140,8 @@ export function check({ list = false } = {}) {
       if (holes(k) !== holes(v))
         errors.push(`src/locales/${lang}.json: placeholders differ: ${JSON.stringify(k.slice(0, 60))}`);
   const used = new Set([...keys.keys()].flatMap(k => [k, k.split('|')[0]]));
-  const unused = lang => Object.keys(lang).filter(k => !used.has(k)).length;
+  // '<English command>|command' entries are a language's own command names, read by data.js CMDS
+  const unused = lang => Object.keys(lang).filter(k => !used.has(k) && !k.endsWith('|command')).length;
   const shown = list ? errors : errors.slice(0, 40);
   for (const e of shown) console.log('  i18n:', e);
   if (shown.length < errors.length) console.log(`  i18n: ... ${errors.length - shown.length} more (--list)`);
