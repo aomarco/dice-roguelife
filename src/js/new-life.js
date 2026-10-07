@@ -299,7 +299,7 @@ async function rollFromForm(inherit, sel) {
   const wn = $('#worldNote');
   if (wn && sel.mode === 'free') life.seedNotes = wn.value.trim().slice(0, 1200); // the save's first user notes, so the opening scene knows them
   rememberFormDefaults(life);
-  app.pendingRoll = { life, inherit };
+  app.pendingRoll = { life, inherit, lang: storyLang() }; // the language the fate was rolled in, even if the screen changes before starting
   revealFate(life, inherit);
 }
 // the form's answers become the next new game's defaults (each save keeps the copy it started with)
@@ -537,7 +537,7 @@ function revealFate(life, inherit, again) {
   };
 }
 async function beginLife() {
-  const { life, inherit } = app.pendingRoll;
+  const { life, inherit, lang } = app.pendingRoll;
   app.pendingRoll = null;
   const b = BASE[life.originTier];
   const skills = [
@@ -565,6 +565,7 @@ async function beginLife() {
     v: 1,
     goldV: 2,
     rules: inherit ? app.state.rules : snapshotRules(),
+    lang,
     life,
     lifeNo,
     stats: Object.assign(

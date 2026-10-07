@@ -30,10 +30,11 @@ let loaded = false; // set once boot has read the stored settings: before that a
 export function setting(key) {
   return app.settings[key] || SETTING_DEFAULTS[key];
 }
-// the narrator's language; defaults to the screen's
+// the narrator's language: the open save's own (kept from the day its first life began), else the one a new game gets
 export function storyLang() {
-  return app.settings.lang || uiLang();
+  return (app.state && app.state.lang) || newStoryLang();
 }
+export const newStoryLang = () => app.settings.lang || uiLang();
 export function widgetStyle(key) {
   const v = setting(key);
   return v !== 'auto' ? v : AUTO_STYLE[key][storyLang()] || AUTO_STYLE[key].en;

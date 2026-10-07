@@ -18,8 +18,10 @@ English is the source language. Each other language is a JSON map keyed by the E
 - Same English with two meanings in another language: `Tc('tab', 'Save')`, catalog key `"Save|tab"`.
 - A specific language: `tIn(lang, ...)`. Prompt fragments in `prompt.js`: `pl(...)` (prompt language).
 - Fixed text in `src/index.html`: `data-t`, `data-t-html`, `data-t-attr="placeholder,aria-label"`.
-- Two languages: the screen's (`uiLang()`, setting `uiLang`) and the story's (`storyLang()`, setting `lang`, defaults
-  to the screen's). A new life stores world, race, origin and talent in the story language (`worldIn`, `tIn`).
+- Two languages: the screen's (`uiLang()`, setting `uiLang`) and the story's (`storyLang()`): the open save's
+  `app.state.lang`, set when its first life begins from `newStoryLang()` (setting `lang`, else the screen's); saves
+  older than v2.6 get it in `compat.js` from the world's name. The player may type in any language; the prompts' `lang`
+  block tells the narrator to answer in the story language and how to render other languages' speech. A new life stores world, race, origin and talent in the story language (`worldIn`, `tIn`).
   Prompts: a Korean story reads `prompts.json`; English and Japanese stories read `prompts.en` (`pr(key)`), and
   Japanese adds `prompts.lang.ja`.
 - Stored or compared values are enums (`src/js/enums.js`), never words. Labels are `N_()` maps shown with `T()`.

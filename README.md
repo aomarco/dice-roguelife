@@ -18,7 +18,8 @@ way. When you die, you regress and are reborn in a different body in a different
 before.
 
 The screen comes in English, Korean and Japanese: the game starts in your browser's language, and you can switch in
-**⚙ Settings → Language**. The story language is a separate setting (English, Korean or Japanese).
+**⚙ Settings → Language**. Each save keeps the story language it began in (English, Korean or Japanese), and you can type in any
+language: the narrator answers in the story language.
 
 - Genre worlds (hunter, murim martial arts, romance fantasy, apocalypse, tower climbing and more) and grades from EX to F
 - Luck: check dice, critical successes and failures, daily luck, the Gambler's Stone

@@ -3,7 +3,8 @@ import { host } from './host.js';
 import { $, esc, IGNORED, noteIgnored, nowIso, toast } from './util.js';
 import { platform } from './db.js';
 import { app, APP_VERSION } from './app.js';
-import { saveSettings, setting, SETTING_DEFAULTS } from './settings.js';
+import { saveSettings, setting, SETTING_DEFAULTS, storyLang } from './settings.js';
+import { persist } from './persistence.js';
 import { LANG_NAMES, langOptions, locale, N_, setUiLang, SOURCE_LANG, T, translateStatic, uiLang } from './i18n.js';
 import { ERRLOG } from './diag.js';
 import { GROWTH_LEVELS, growthLevel, lifeDiff, rule } from './rules.js';
@@ -59,7 +60,7 @@ function settingsHtml() {
         ['150000', N_('Very large (150KB)')],
       ],
     )}</select><p class="muted recent-note"><span id="recentNow">${recentLine()}</span>${T('Short turns fit more, long turns fewer. At 150KB replies slow down and may hit the limit.')}</p></div>
-    <div class="row lang-row"><div class="field grow"><label for="langSel">${T('Story language')}</label><select id="langSel"><option value="">${T('Same as the screen')}</option>${langOptions(Object.keys(LANG_NAMES))}</select></div>
+    <div class="row lang-row"><div class="field grow"><label for="langSel">${app.state ? T('Story language (this save)') : T('Story language for new games')}</label><select id="langSel">${app.state ? '' : `<option value="">${T('Same as the screen')}</option>`}${langOptions(Object.keys(LANG_NAMES))}</select></div>
     <label class="row opt lang-tip"><input type="checkbox" id="langTip"> ${T('Show corrections of my input')}</label></div>
     <label class="row opt settings-opt"><input type="checkbox" id="discreet"> ${T('Discreet mode: the title becomes Claude, and images, the status window, colors and sounds are hidden (or tap the title three times)')}</label>
     <div id="discreetNav" class="row discreet-nav hidden">${[
@@ -151,7 +152,7 @@ function settingsHtml() {
     <details class="diag-box"><summary class="muted">${T('Diagnostics')}</summary><div id="diag" class="muted diag-body">${T('Checking...')}</div></details>
     <details class="diag-box"><summary class="muted">${T('Recent errors')} ${ERRLOG.length ? `(${ERRLOG.length})` : ''}</summary><div class="diag-body diag-log">${ERRLOG.map(e => `[${e.t}] ${e.stage} ${e.code} ${esc(e.msg)}${e.text ? '\n  → ' + esc(e.text) : ''}`).join('\n\n') || T('None')}</div></details>
     <details class="diag-box"><summary class="muted">${T('Skipped errors')} ${IGNORED.length ? `(${IGNORED.length})` : ''}</summary><div class="diag-body diag-log">${IGNORED.map(e => `[${e.t}] ${esc(e.where)}: ${esc(e.msg)}`).join('\n') || T('None')}</div></details>
-    <p class="muted settings-help">${T('Narration model: Fast is light and quick; Deep uses the strongest model.<br>Narration length: by default the model decides.<br>Story language: narration, dialogue, choices and widgets all come in this language.<br>Input corrections: shows one line fixing what you wrote (spelling and spacing for Korean, grammar and word choice for English and Japanese).<br>All take effect from the next turn.')}</p>`;
+    <p class="muted settings-help">${T('Narration model: Fast is light and quick; Deep uses the strongest model.<br>Narration length: by default the model decides.<br>Story language: each save keeps the one it began in, and narration, dialogue, choices and widgets all come in it.<br>Input corrections: shows one line fixing what you wrote (spelling and spacing for Korean, grammar and word choice for English and Japanese).<br>All take effect from the next turn.')}</p>`;
 }
 async function runDiag(el) {
   const out = [];
@@ -223,14 +224,6 @@ const PLAIN_SETTINGS = [
     apply: q => showRecentNow(q),
     saved: NEXT_TURN,
   },
-  {
-    id: 'langSel',
-    key: 'lang',
-    show: v => v || '',
-    parse: v => v || null,
-    apply: redrawLog, // 'auto' board and messenger styles follow it
-    saved: NEXT_TURN,
-  },
   { id: 'langTip', key: 'langTip' },
   {
     id: 'discreet',
@@ -297,6 +290,7 @@ function bindSettings(root) {
   const q = id => root.querySelector('#' + id);
   for (const c of PLAIN_SETTINGS) bindPlainSetting(q, c);
   bindUiLang(q);
+  bindStoryLang(q);
   showAdminCustom(q);
   bindTierCheck(q);
   bindDiscreetNav(q);
@@ -338,6 +332,30 @@ function bindUiLang(q) {
     chooseUiLang(el.value);
     openSettingsSheet();
     if ($('#sheetInner')) $('#sheetInner').scrollTop = top;
+  };
+}
+// With a save open the story language is that save's (the screen language never changes it); otherwise it is the
+// language new games start in, by default the screen's.
+function bindStoryLang(q) {
+  const el = q('langSel');
+  el.value = app.state ? storyLang() : app.settings.lang || '';
+  el.onchange = async () => {
+    try {
+      if (app.state) {
+        app.state.lang = el.value;
+        await persist();
+      } else {
+        app.settings.lang = el.value || null;
+        await saveSettings();
+      }
+    } catch (e) {
+      toast(T('Save failed: {err}', { err: e.code || e.message }));
+      return;
+    }
+    redrawLog(); // 'auto' board and messenger styles follow it
+    toast(
+      app.state ? T('Saved. This save continues in it from the next turn; earlier turns stay as written') : T(SAVED),
+    );
   };
 }
 // the player picks a screen language: kept in the settings and applied

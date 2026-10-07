@@ -642,7 +642,6 @@
   "Large (80KB)": "大（80KB）",
   "Very large (150KB)": "特大（150KB）",
   "Short turns fit more, long turns fewer. At 150KB replies slow down and may hit the limit.": "ターンが短ければ多く、長ければ少なく入ります。150KBだと返答が遅くなり、上限に達することがあります。",
-  "Story language": "物語の言語",
   "Same as the screen": "画面と同じ",
   "Show corrections of my input": "自分の入力の添削を表示",
   "Discreet mode: the title becomes Claude, and images, the status window, colors and sounds are hidden (or tap the title three times)": "こっそりモード：タイトルがClaudeになり、画像、ステータスウィンドウ、色、音を隠します（タイトルを3回タップしても切り替え可能）",
@@ -684,7 +683,7 @@
   "Checking...": "確認中...",
   "Recent errors": "最近のエラー",
   "Skipped errors": "スキップしたエラー",
-  "Narration model: Fast is light and quick; Deep uses the strongest model.<br>Narration length: by default the model decides.<br>Story language: narration, dialogue, choices and widgets all come in this language.<br>Input corrections: shows one line fixing what you wrote (spelling and spacing for Korean, grammar and word choice for English and Japanese).<br>All take effect from the next turn.": "語りのモデル：「高速」は軽くて速く、「じっくり」は最も強力なモデルを使います。<br>語りの分量：既定ではモデルが決めます。<br>物語の言語：語り、セリフ、選択肢、ウィジェットがすべてこの言語で表示されます。<br>入力文の添削：あなたが書いた文を直した一行を表示します（韓国語は綴りと分かち書き、英語と日本語は文法と語彙）。<br>いずれも次のターンから反映されます。",
+  "Narration model: Fast is light and quick; Deep uses the strongest model.<br>Narration length: by default the model decides.<br>Story language: each save keeps the one it began in, and narration, dialogue, choices and widgets all come in it.<br>Input corrections: shows one line fixing what you wrote (spelling and spacing for Korean, grammar and word choice for English and Japanese).<br>All take effect from the next turn.": "語りのモデル：「高速」は軽くて速く、「じっくり」は最も強力なモデルを使います。<br>語りの分量：既定ではモデルが決めます。<br>物語の言語：セーブごとに始めたときの言語で続き、語り、セリフ、選択肢、ウィジェットがすべてこの言語で表示されます。<br>入力文の添削：あなたが書いた文を直した一行を表示します（韓国語は綴りと分かち書き、英語と日本語は文法と語彙）。<br>いずれも次のターンから反映されます。",
   "Version: v{version}": "バージョン：v{version}",
   "Host: {id}": "ホスト：{id}",
   "Save path: {path}": "保存先：{path}",
@@ -1049,5 +1048,8 @@
   "LINE": "LINE",
   "Dark mode for messenger and board widgets too": "メッセンジャーと掲示板のウィジェットもダークモードに",
   "{n} {n|comment|comments}": "コメント {n}件",
-  "Read": "既読"
+  "Read": "既読",
+  "Story language (this save)": "物語の言語（このセーブ）",
+  "Story language for new games": "新しいゲームの物語の言語",
+  "Saved. This save continues in it from the next turn; earlier turns stay as written": "保存しました。このセーブは次のターンからこの言語で続きます。これまでのターンはそのままです"
 }

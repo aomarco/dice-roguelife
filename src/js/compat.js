@@ -2,6 +2,7 @@
 import { currencyOf, initMurim, normGender, rollSubStats, WORLD_ALIAS, WORLDS, worldIn } from './data.js';
 import { artsToEnums, fromLegacy, LEGACY } from './enums.js';
 import { dedupeQuests, snapshotRules } from './rules.js';
+import { okLang } from './i18n.js';
 
 export function compat(st) {
   st.cast = st.cast || {};
@@ -27,8 +28,15 @@ export function compat(st) {
   if (st.stats && st.stats.con === undefined) st.stats.con = rollSubStats(st.life ? st.life.originTier : 'C').con;
   st.clock = st.clock || { day: 0, date: '', time: '', weather: '', place: '' };
   if (st.life && st.life.world.id === 'murim' && !st.murim) st.murim = initMurim(st.life.originTier);
+  if (!okLang(st.lang)) st.lang = langOfLife(st.life);
   toEnums(st);
   return st;
+}
+// Saves from before v2.6 followed the settings' story language. The world's name was written in the story language
+// (never typed by the player), so it tells which one the save was played in; saves older than v2.5 are Korean.
+function langOfLife(life) {
+  const w = String((life && life.world && life.world.name) || '');
+  return /[가-힣]/.test(w) || !w ? 'ko' : /[぀-ヿ]/.test(w) ? 'ja' : 'en';
 }
 // Korean values stored before v2.5 (enums.js LEGACY)
 function toEnums(st) {

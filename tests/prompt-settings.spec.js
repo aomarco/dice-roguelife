@@ -4,7 +4,7 @@ import { test, expect } from './support/test.js';
 import { claudeMock, startLife } from './support/harness.js';
 
 const CHECK = String.raw`(()=>{const p=DR.buildPrompt('간다',null);const at=s=>s?p.indexOf(s):-2;const rules=p.indexOf('\nRules:\n');
-  return {lang:at(DR.prompts.lang.en),len:at(DR.pr('lenLong')),tip:at(DR.prompts.tip.en),rules,bytes:new Blob([p]).size}})()`;
+  return {ko:at(DR.prompts.lang.ko),lang:at(DR.prompts.lang.en),len:at(DR.pr('lenLong')),tip:at(DR.prompts.tip.en),rules,bytes:new Blob([p]).size}})()`;
 
 test('prompt settings', async ({ game }) => {
   const { pg, errs } = await game(claudeMock(), { size: [420, 900] });
@@ -14,7 +14,9 @@ test('prompt settings', async ({ game }) => {
   const plain = await pg.evaluate(CHECK);
   console.log('default settings:', plain);
   if (plain.lang !== -1 || plain.len !== -1 || plain.tip !== -1) errs.push('blocks present with default settings');
-  await pg.evaluate("DR.app.settings.lang='en';DR.app.settings.len='long';DR.app.settings.langTip=true;0");
+  if (plain.ko < 0 || plain.ko > plain.rules) errs.push('a Korean story is not told to answer in Korean');
+  // the story language belongs to the save (the settings' one is for new games)
+  await pg.evaluate("DR.app.state.lang='en';DR.app.settings.len='long';DR.app.settings.langTip=true;0");
   const on = await pg.evaluate(CHECK);
   console.log('english, long, correction:', on);
   for (const k of ['lang', 'len', 'tip']) {
