@@ -720,6 +720,24 @@ const GROUPS = {
       await say(pg, S.inputs.heroChat, 'heroChat', 1500);
       await shotFrom(S.inputs.heroChat, `pc-chat-${look}`, PROMO);
     }
+    // the guild's quest board and the evening news, each in both of its looks
+    for (const [scn, input, key, looks] of [
+      ['heroQuest', S.inputs.quest, 'questStyle', ['board', 'ui']],
+      ['heroNews', S.inputs.news, 'newsStyle', ['broadcast', 'paper']],
+    ]) {
+      if (!S.replies[scn]) continue;
+      await say(pg, input, scn, 1500);
+      for (const look of looks) {
+        await pg.evaluate(
+          ([k, l]) => {
+            DR.app.settings[k] = l;
+            DR.renderLog('keep');
+          },
+          [key, look],
+        );
+        await shotFrom(input, `pc-${scn === 'heroQuest' ? 'quest' : 'news'}-${look}`, PROMO);
+      }
+    }
     await ctx.close();
   },
 

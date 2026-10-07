@@ -473,6 +473,77 @@
           }
         ]
       }
+    },
+    "heroQuest": {
+      "admin": "The guild board, overnight. Everyone wants the kid with the map now.",
+      "narration": "The hunters' guild has pinned up a whole new section. Half of it mentions sewers.",
+      "widget": {
+        "type": "quest",
+        "board": "Mangwon Hunter Guild",
+        "subtitle": "Sewer gate district",
+        "quests": [
+          {
+            "title": "Map the Mangwon storm drains",
+            "rank": "C",
+            "client": "Hunter Mira",
+            "deadline": "3 days",
+            "difficulty": 3,
+            "body": "Mira wants every entrance between Mangwon and Hapjeong on paper before the Association seals them.",
+            "objectives": ["Chart gates C-3 to C-6", "Mark the pumping station shortcuts"],
+            "location": "Mangwon storm drains",
+            "reward": "400,000 won and a hunter's letter of introduction",
+            "note": "Bring your own flashlight",
+            "status": "Open"
+          },
+          {
+            "title": "Find out who is asking about C-3",
+            "rank": "B",
+            "client": "Anonymous",
+            "deadline": "Tonight",
+            "difficulty": 4,
+            "body": "Two men in suits with Association pins have been asking shopkeepers about a kid with maps.",
+            "objectives": ["Learn their names", "Stay unseen"],
+            "location": "Mangwon market",
+            "reward": "250,000 won",
+            "status": "Open"
+          },
+          {
+            "title": "Clear the rats from gate C-3",
+            "rank": "D",
+            "client": "Mangwon convenience store",
+            "deadline": "This week",
+            "difficulty": 1,
+            "body": "The rats came up with the rift. The night-shift guy would like his storage room back.",
+            "objectives": ["Clear the storage room", "Do not damage the ramen"],
+            "location": "Convenience store basement",
+            "reward": "Free ramen for a month",
+            "status": "Open"
+          }
+        ]
+      },
+      "choices": [
+        "Take Mira's mapping job (success chance 70%)",
+        "Shadow the men in suits (success chance 35%)",
+        "Clear the rats for ramen"
+      ]
+    },
+    "heroNews": {
+      "admin": "You are on the evening news. Congratulations. Also, run.",
+      "narration": "The convenience store TV cuts to a breaking bulletin.",
+      "widget": {
+        "type": "news",
+        "section": "Breaking",
+        "outlet": "Hunter Daily",
+        "time": "9:40 PM",
+        "headline": "Unregistered gate entrance found under Mangwon, traced to a 12-year-old's map",
+        "reporter": "Kim Seo-jin",
+        "body": "The Hunter Association confirmed tonight that gate entrance C-3 beneath the Mangwon storm drains had never been logged. Hunters say the location came from a hand-drawn map sold outside a convenience store. The Association warned citizens not to buy or sell gate maps and said it would like to speak with the mapmaker.",
+        "quotes": [
+          "\"We just want to talk to the kid.\" (Association spokesperson)",
+          "\"He paid me in ramen once.\" (convenience store clerk)"
+        ]
+      },
+      "choices": ["Turn the TV off and leave (success chance 60%)", "Call Mira", "Ask the clerk to keep quiet"]
     }
   },
   "heroStatus": {
