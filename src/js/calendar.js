@@ -1,54 +1,94 @@
 /* ============ calendar: in-game dates and clock times ============ */
-// the weekday is computed, never written by the narrator: only for plain calendar dates ("2035년 4월 5일"), never for a world's own calendar ("제국력 1203년")
-const WEEKDAYS = '일월화수목금토';
-export function parseKDate(x) {
-  const m = /(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/.exec(String(x || ''));
-  if (!m) return null;
-  const y = +m[1],
-    mo = +m[2],
-    d = +m[3];
+// The weekday is computed, never written by the narrator: only for plain calendar dates, never for a world's own
+// calendar ("제국력 1203년"). Each language's date and time patterns are in reply/<lang>.js.
+import { locale } from './i18n.js';
+import { any, profiles } from './reply-words.js';
+
+// the first date in s by profile p (at its start when anchored): { y, m, d, text }, or null
+function dateBy(p, s, anchored) {
+  for (const { re, months } of p.date) {
+    const m = re.exec(s);
+    if (!m || (anchored && m.index !== 0)) continue;
+    const g = m.groups;
+    const mo = g.mon ? months.indexOf(g.mon.slice(0, 3).toLowerCase()) + 1 : +g.m;
+    return { y: +g.y, m: mo, d: +g.d, text: m[0] };
+  }
+  return null;
+}
+const utcDate = (y, mo, d) => {
   const dt = new Date(Date.UTC(y, mo - 1, d));
-  return dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d
-    ? `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`
-    : null;
+  return dt.getUTCMonth() === mo - 1 && dt.getUTCDate() === d ? dt : null;
+};
+const isoOf = (y, mo, d) => `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+const FMT = {}; // Intl formatters by kind and language: building one costs more than formatting many dates
+const formatter = (kind, lang) =>
+  (FMT[kind + lang] ||= new Intl.DateTimeFormat(
+    locale(lang),
+    kind === 'wd'
+      ? { weekday: 'short', timeZone: 'UTC' }
+      : { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' },
+  ));
+const weekday = (dt, lang) => formatter('wd', lang).format(dt);
+
+export function parseKDate(x) {
+  const s = String(x || '');
+  for (const p of profiles()) {
+    const f = dateBy(p, s);
+    if (f) return utcDate(f.y, f.m, f.d) ? isoOf(f.y, f.m, f.d) : null;
+  }
+  return null;
 }
 export function addDaysISO(iso, n) {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d + n));
   return dt.toISOString().slice(0, 10);
 }
-export function fmtKDate(iso) {
+// "2035년 4월 5일 (목)", "April 5, 2035 (Thu)", "2035年4月5日 (木)"
+export function fmtKDate(iso, lang = 'ko') {
   const [y, m, d] = iso.split('-').map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d));
-  return `${y}년 ${m}월 ${d}일 (${WEEKDAYS[dt.getUTCDay()]})`;
+  return `${formatter('date', lang).format(dt)} (${weekday(dt, lang)})`;
 }
+// minutes after midnight, or null when the hour is ambiguous
 export function clockMin(t) {
   t = String(t || '');
-  let m = /(\d{1,2}):(\d{2})/.exec(t);
+  for (const p of profiles())
+    for (const c of p.clock) {
+      const m = c.re.exec(t);
+      if (!m) continue;
+      const g = m.groups,
+        h0 = +g.h,
+        per = g.period || '';
+      if (h0 < 1 || h0 > 12) continue;
+      let h = h0 % 12;
+      if (c.pm && c.pm.test(per)) h += 12;
+      else if (c.day && c.day.test(per) && h0 < 6) h += 12;
+      else if (c.night && c.night.test(per) && h0 >= 6 && h0 < 12) h += 12;
+      return h * 60 + (g.m != null ? +g.m : g.half ? 30 : 0);
+    }
+  const m = /(\d{1,2}):(\d{2})/.exec(t);
   if (m) return (+m[1] % 24) * 60 + +m[2];
-  if (/자정/.test(t)) return 0;
-  if (/정오/.test(t)) return 720; /* minutes after midnight, or null when the hour is ambiguous */
-  m = /(오전|오후|새벽|아침|낮|저녁|밤)\s*(\d{1,2})\s*시(?:\s*(\d{1,2})\s*분|\s*(반))?/.exec(t);
-  if (!m) return null;
-  const ap = m[1],
-    h0 = +m[2];
-  if (h0 < 1 || h0 > 12) return null;
-  let h = h0 % 12;
-  if (ap === '오후' || ap === '저녁') h += 12;
-  else if (ap === '낮' && h0 < 6) h += 12;
-  else if (ap === '밤' && h0 >= 6 && h0 < 12) h += 12;
-  return h * 60 + (m[3] != null ? +m[3] : m[4] ? 30 : 0);
+  if (any('midnight')(t)) return 0;
+  if (any('noon')(t)) return 720;
+  return null;
 }
+// the log calls this for every turn on every redraw, with the same few dates: remember the answers
+const WD_SEEN = new Map();
 export function withWeekday(date) {
-  const s = String(date || '')
-    .replace(/\s*\(([월화수목금토일])\)|\s*[월화수목금토일]요일/g, '')
-    .trim();
-  const m = /^(?:서기\s*)?(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일/.exec(s);
-  if (!m) return date || '';
-  const y = +m[1],
-    mo = +m[2],
-    d = +m[3];
-  const dt = new Date(Date.UTC(y, mo - 1, d));
-  if (dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return date || '';
-  return s.replace(m[0], `${m[0]} (${WEEKDAYS[dt.getUTCDay()]})`);
+  const s = String(date || '');
+  if (WD_SEEN.has(s)) return WD_SEEN.get(s);
+  const out = addWeekday(s, date);
+  if (WD_SEEN.size > 200) WD_SEEN.clear();
+  WD_SEEN.set(s, out);
+  return out;
+}
+function addWeekday(s, date) {
+  for (const p of profiles()) {
+    const bare = s.replace(p.weekday, '').trim();
+    const f = dateBy(p, bare, true);
+    if (!f) continue;
+    const dt = utcDate(f.y, f.m, f.d);
+    return dt ? bare.replace(f.text, `${f.text} (${weekday(dt, p.lang)})`) : date || '';
+  }
+  return date || '';
 }

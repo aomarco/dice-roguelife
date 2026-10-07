@@ -1,5 +1,6 @@
 /* ============ hall of lives (shared) ============ */
 import { $, esc, noteIgnored, nowIso, toast } from './util.js';
+import { locale, T } from './i18n.js';
 import { platform, userCol } from './db.js';
 import { turnStore } from './turn-store.js';
 import { app } from './app.js';
@@ -32,7 +33,7 @@ export async function shareToHall(i) {
   const t = app.turns.find(x => x.i === i);
   if (!t || !t.out || t.out.hallId) return;
   if (!app.settings.nick) {
-    const n = await askPrompt('전당에 표시할 이름', app.state.life.name);
+    const n = await askPrompt(T('Name to show in the Hall'), app.state.life.name);
     if (n === null) return;
     app.settings.nick = n.trim().slice(0, 20) || app.state.life.name;
     await saveSettings();
@@ -43,13 +44,13 @@ export async function shareToHall(i) {
     const ref = await platform.shared.collection('hall').add(e);
     t.out.hallId = ref.id;
     await turnStore.update(t);
-    toast('전당에 올렸어요');
+    toast(T('Posted to the Hall'));
     renderLog();
   } catch (e) {
     toast(
       e.code === 'permission_denied' || e.code === 'not_granted'
-        ? '올릴 권한이 없어요'
-        : '실패: ' + (e.message || e.code),
+        ? T("You don't have permission to post")
+        : T('Failed: {err}', { err: e.message || e.code }),
     );
   }
 }
@@ -64,21 +65,21 @@ async function setHallVisibility(r, pub) {
   try {
     await dbFor(to).doc(`${to}/${r.id}`).set(data);
     await dbFor(from).doc(`${from}/${r.id}`).delete();
-    toast(pub ? '공개로 바꿨어요' : '나만 보기로 바꿨어요');
+    toast(pub ? T('Made public') : T('Made private'));
     renderHall();
   } catch (e) {
-    toast('바꿀 수 없어요');
+    toast(T("Couldn't change it"));
   }
 }
 export async function renderHall() {
   const box = $('#hallBox');
-  box.innerHTML = '<p class="muted">불러오는 중...</p>';
+  box.innerHTML = `<p class="muted">${T('Loading...')}</p>`;
   let rows = [];
   try {
     const q = await platform.shared.collection('hall').orderBy('score', 'desc').limit(100).get();
     rows = q.docs.map(d => Object.assign({ id: d.id }, d.data()));
   } catch (e) {
-    box.innerHTML = '<p class="muted">전당을 불러올 수 없어요.</p>';
+    box.innerHTML = `<p class="muted">${T("Couldn't load the Hall.")}</p>`;
     return;
   }
   try {
@@ -88,8 +89,8 @@ export async function renderHall() {
     noteIgnored('hall: private entries', e);
   }
   rows.sort((a, b) => b.score - a.score);
-  box.innerHTML = `<div class="row view-head hall-head"><h3 class="view-title">인생 전당</h3><button class="btn ghost hall-nick" id="nickBtn">${esc(app.settings.nick || '표시 이름')}</button></div>
-   <p class="muted hall-intro">결산에서 올린 삶들이에요. 탭하면 공유 카드가 열려요.</p>
+  box.innerHTML = `<div class="row view-head hall-head"><h3 class="view-title">${T('Hall of Lives')}</h3><button class="btn ghost hall-nick" id="nickBtn">${esc(app.settings.nick || T('Display name'))}</button></div>
+   <p class="muted hall-intro">${T('Lives posted from their Life Review. Tap one to open its share card.')}</p>
    <div class="list">${
      rows
        .map(
@@ -97,13 +98,13 @@ export async function renderHall() {
            r,
            idx,
          ) => `<div class="item hall-entry" data-row="${r.id}"><div class="row hall-entry-head"><div class="t">${idx + 1}. ${esc(r.charName)} <span class="tier ${r.tier}">${r.tier}</span> <span class="muted hall-by">${esc(r.nick || '')}${r._private ? ' 🔒' : ''}</span></div><b class="hall-score">${r.score}</b></div>
-     <div class="m">${esc(r.world)}, ${esc(r.origin)}, ${r.lifeNo}회차, ${r.age}세</div><div class="hall-epitaph">${esc(r.epitaph)}</div>
-     ${r.uid === platform.userId ? `<div class="row hall-tools"><button class="x hall-tool" data-vis="${r.id}">${r._private ? '공개로' : '나만 보기'}</button><button class="x hall-tool" data-delh="${r.id}">내리기</button></div>` : ''}</div>`,
+     <div class="m">${esc(r.world)}, ${esc(r.origin)}, ${T('life {n}', { n: r.lifeNo })}, ${T('age {n}', { n: r.age })}</div><div class="hall-epitaph">${esc(r.epitaph)}</div>
+     ${r.uid === platform.userId ? `<div class="row hall-tools"><button class="x hall-tool" data-vis="${r.id}">${r._private ? T('Make public') : T('Only me')}</button><button class="x hall-tool" data-delh="${r.id}">${T('Take down')}</button></div>` : ''}</div>`,
        )
-       .join('') || '<p class="muted">아직 아무도 없어요.</p>'
+       .join('') || `<p class="muted">${T('No one yet.')}</p>`
    }</div>`;
   $('#nickBtn').onclick = async () => {
-    const n = await askPrompt('전당에 표시할 이름', app.settings.nick || '');
+    const n = await askPrompt(T('Name to show in the Hall'), app.settings.nick || '');
     if (n === null) return;
     app.settings.nick = n.trim().slice(0, 20);
     await saveSettings();
@@ -126,7 +127,7 @@ export async function renderHall() {
   box.querySelectorAll('[data-delh]').forEach(
     b =>
       (b.onclick = async () => {
-        if (!(await askConfirm('전당에서 내릴까요?'))) return;
+        if (!(await askConfirm(T('Take this down from the Hall?')))) return;
         const r = rows.find(x => x.id === b.dataset.delh);
         try {
           await (r._private ? platform.db : platform.shared)
@@ -134,24 +135,24 @@ export async function renderHall() {
             .delete();
           renderHall();
         } catch (e) {
-          toast('내릴 수 없어요');
+          toast(T("Couldn't take it down"));
         }
       }),
   );
 }
 export function openShareCard(r) {
   if (!r) return;
-  const text = `[주사위가 정한 인생] ${r.charName}의 ${r.lifeNo}번째 삶 ${r.score}점\n${r.world} / ${r.origin}(${r.tier}) / ${r.age}세\n"${r.epitaph}"${r.highlights && r.highlights.length ? '\n- ' + r.highlights.join('\n- ') : ''}`;
+  const text = `${T('[Dice Roguelife] {name}, life {n}: {score} points', { name: r.charName, n: r.lifeNo, score: r.score })}\n${r.world} / ${r.origin}(${r.tier}) / ${T('age {n}', { n: r.age })}\n"${r.epitaph}"${r.highlights && r.highlights.length ? '\n- ' + r.highlights.join('\n- ') : ''}`;
   openSheet(
-    `<div class="sharecard tier-${r.tier}"><div class="sc-top"><span>주사위가 정한 인생</span><span>${r.lifeNo}번째 삶</span></div>
+    `<div class="sharecard tier-${r.tier}"><div class="sc-top"><span>${T('Dice Roguelife')}</span><span>${T('Life {n}', { n: r.lifeNo })}</span></div>
     <div class="sc-name">${esc(r.charName)} <span class="tier ${r.tier}">${r.tier}</span></div>
-    <div class="sc-meta">${esc(r.world)}, ${esc(r.origin)}, ${r.age}세${r.talent ? ', 재능 ' + esc(r.talent) : ''}</div>
-    <div class="sc-score"><b>${r.score}</b><small>점</small></div>
+    <div class="sc-meta">${esc(r.world)}, ${esc(r.origin)}, ${T('age {n}', { n: r.age })}${r.talent ? ', ' + T('talent {name}', { name: esc(r.talent) }) : ''}</div>
+    <div class="sc-score"><b>${r.score}</b><small>${T('pts')}</small></div>
     <p class="sc-epi">${esc(r.epitaph)}</p>
     ${(r.highlights || []).map(h => `<div class="sc-h">${esc(h)}</div>`).join('')}
-    ${r.inherit ? `<div class="sc-inh">계승: ${esc(r.inherit)}</div>` : ''}
-    <div class="sc-foot">${esc(r.nick || '')}${r.createdAt ? ' · ' + new Date(r.createdAt).toLocaleDateString('ko-KR') : ''}</div></div>
-   <div class="row card-actions"><button class="btn" id="copyCard">텍스트 복사</button><button class="btn ghost" data-close>닫기</button></div>`.replace(
+    ${r.inherit ? `<div class="sc-inh">${T('Inherited: {skill}', { skill: esc(r.inherit) })}</div>` : ''}
+    <div class="sc-foot">${esc(r.nick || '')}${r.createdAt ? ' · ' + new Date(r.createdAt).toLocaleDateString(locale()) : ''}</div></div>
+   <div class="row card-actions"><button class="btn" id="copyCard">${T('Copy text')}</button><button class="btn ghost" data-close>${T('Close')}</button></div>`.replace(
       ' · ',
       ', ',
     ),
@@ -159,9 +160,9 @@ export function openShareCard(r) {
   $('#copyCard').onclick = async () => {
     try {
       await navigator.clipboard.writeText(text);
-      toast('복사됨');
+      toast(T('Copied!'));
     } catch (e) {
-      toast('복사할 수 없어요');
+      toast(T("Couldn't copy"));
     }
   };
 }

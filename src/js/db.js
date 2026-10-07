@@ -1,5 +1,6 @@
 /* ============ capabilities (light up when ready) ============ */
 import { clone, toast, uid } from './util.js';
+import { T } from './i18n.js';
 
 // What the host (host.js) gave this page. boot (boot.js) fills it in once; everything else only reads it.
 export const platform = {
@@ -52,7 +53,7 @@ export function memDB(persistKey) {
       try {
         localStorage.setItem(persistKey, JSON.stringify(Object.fromEntries(store)));
       } catch (e) {
-        toast('이 기기의 저장 공간이 가득 찼어요', 4000);
+        toast(T("This device's storage is full"), 4000);
       }
     }, 150);
   };

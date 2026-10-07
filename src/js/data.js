@@ -1,5 +1,7 @@
 /* ============ data tables (code owns the rules) ============ */
 import { rnd } from './util.js';
+import { isKo, locale, N_, tIn, uiLang } from './i18n.js';
+import { STANCES } from './enums.js';
 
 export const TIERS = ['EX', 'SSS', 'S', 'A', 'B', 'C', 'D', 'E', 'F'];
 export const TIER_P = [
@@ -17,40 +19,40 @@ export const WORLDS = [
   {
     id: 'hunter',
     diff: [2, 4],
-    name: '현대 헌터물',
-    risk: '게이트는 예고 없이 열린다',
-    opp: '각성 한 번이면 인생이 뒤집힌다',
+    name: N_('Modern Hunter'),
+    risk: N_('Gates open without warning'),
+    opp: N_('One awakening turns a life upside down'),
     entry: { transfer: 0.15, possess: 0.1 },
     sponsor: 0.4,
-    from: '검과 마법의 이세계',
+    from: N_('a world of swords and magic'),
   },
   {
     id: 'apoc',
     diff: [4, 5],
-    name: '아포칼립스',
-    desc: '문명이 무너진 뒤의 세계',
-    risk: '물 한 병에 사람이 죽는다',
-    opp: '무너진 세상에선 누구나 왕이 될 수 있다',
+    name: N_('Apocalypse'),
+    desc: N_('A world after civilization fell'),
+    risk: N_('People die over a bottle of water'),
+    opp: N_('In a fallen world, anyone can be king'),
     entry: { transfer: 0.1, possess: 0.05 },
     sponsor: 0.35,
   },
   {
     id: 'academy',
     diff: [1, 4],
-    name: '아카데미물',
-    desc: '각성자나 마법사를 길러내는 명문 학원',
-    risk: '등수가 곧 계급이다',
-    opp: '졸업장 하나로 신분이 바뀐다',
+    name: N_('Academy'),
+    desc: N_('An elite school that trains awakened and mages'),
+    risk: N_('Your class rank is your caste'),
+    opp: N_('One diploma changes your standing'),
     entry: { transfer: 0.1, possess: 0.25 },
     sponsor: 0.3,
   },
   {
     id: 'tower',
     diff: [4, 5],
-    name: '탑 등반물',
-    desc: '정상에 오르면 소원을 이뤄준다는 탑',
-    risk: '층마다 죽음이 기다린다',
-    opp: '꼭대기에 모든 것이 있다',
+    name: N_('Tower Climbing'),
+    desc: N_('A tower said to grant a wish to whoever reaches the top'),
+    risk: N_('Death waits on every floor'),
+    opp: N_('Everything is at the top'),
     entry: { transfer: 0.2, possess: 0.05 },
     sponsor: 0.4,
   },
@@ -58,64 +60,64 @@ export const WORLDS = [
     id: 'vrmmo',
     diff: [2, 4],
     name: 'VR MMO',
-    desc: '가상현실 게임 속. 로그아웃이 안 된다',
-    risk: '게임 속 죽음이 진짜일지도 모른다',
-    opp: '버그와 히든 퀘스트가 곧 기회다',
+    desc: N_("Inside a VR game. You can't log out"),
+    risk: N_('Death in the game may be real'),
+    opp: N_('Bugs and hidden quests are your chance'),
     entry: { transfer: 0.05, possess: 0.05 },
     sponsor: 0.3,
   },
   {
     id: 'fantasy',
     diff: [2, 4],
-    name: '정통 판타지',
-    risk: '죽음은 흔하고 신분은 단단하다',
-    opp: '기연은 던전 바닥에 있다',
+    name: N_('High Fantasy'),
+    risk: N_('Death is common and class is set in stone'),
+    opp: N_('Fortune lies at the bottom of the dungeon'),
     entry: { transfer: 0.2, possess: 0.1 },
     sponsor: 0.15,
   },
   {
     id: 'rofan',
     diff: [1, 4],
-    name: '로맨스 판타지',
-    risk: '칼보다 소문이 위험하다',
-    opp: '결혼이 무기다',
+    name: N_('Romance Fantasy'),
+    risk: N_('Rumors are deadlier than swords'),
+    opp: N_('Marriage is a weapon'),
     entry: { transfer: 0.1, possess: 0.35 },
     sponsor: 0.05,
   },
   {
     id: 'murim',
     diff: [3, 5],
-    name: '동양 무협',
-    risk: '한 수에 목이 날아간다',
-    opp: '경지가 곧 신분이다',
+    name: N_('Murim'),
+    risk: N_('One move can cost your head'),
+    opp: N_('Your realm is your rank'),
     entry: { transfer: 0.1, possess: 0.15 },
     sponsor: 0.1,
   },
   {
     id: 'palace',
     diff: [3, 5],
-    name: '동양 궁중물',
-    desc: '황궁과 후궁, 조정의 암투',
-    risk: '말 한마디에 삼족이 멸한다',
-    opp: '총애 한 번이면 하늘에 닿는다',
+    name: N_('Imperial Palace'),
+    desc: N_('Intrigue in the palace, the harem and the court'),
+    risk: N_('One wrong word and three generations die'),
+    opp: N_('One moment of favor and you touch the sky'),
     entry: { transfer: 0.1, possess: 0.3 },
     sponsor: 0.05,
   },
   {
     id: 'cyber',
     diff: [3, 5],
-    name: 'SF 사이버펑크',
-    risk: '몸을 판 만큼 산다',
-    opp: '기업이 신이고, 신은 거래한다',
+    name: N_('Cyberpunk'),
+    risk: N_('You live on what you sell of your body'),
+    opp: N_('Corporations are gods, and gods make deals'),
     entry: { transfer: 0.05, possess: 0.05 },
     sponsor: 0.1,
   },
   {
     id: 'monster',
     diff: [5, 5],
-    name: '인외마경',
-    risk: '모든 것이 사냥감이고, 너도 그중 하나다',
-    opp: '먹은 만큼 강해지고, 강해진 만큼 모습이 바뀐다',
+    name: N_('Monster Realm'),
+    risk: N_('Everything is prey, and so are you'),
+    opp: N_('You grow stronger with what you eat, and change as you grow'),
     entry: { transfer: 0.15, possess: 0.05 },
     sponsor: 0.2,
   },
@@ -127,9 +129,11 @@ export const WORLD_ALIAS = {
   reverse: ['hunter', 'transfer'],
   possess: ['rofan', 'possess'],
 };
-export const ENTRY_NAME = { native: '토박이', transfer: '전이자', possess: '빙의자' };
-const STANCES = ['무관심', '경쟁', '적대', '협력'];
-// per ADMIN persona: 무관심, 경쟁, 적대, 협력
+export function worldIn(w, lang) {
+  const tr = x => (x ? tIn(lang, x) : x);
+  return { ...w, name: tr(w.name), desc: tr(w.desc), risk: tr(w.risk), opp: tr(w.opp), from: tr(w.from) };
+}
+// per ADMIN persona, in STANCES order
 const STANCE_P = {
   star: [0.3, 0.35, 0.25, 0.1],
   dealer: [0.25, 0.45, 0.2, 0.1],
@@ -156,101 +160,174 @@ export function rollSponsor(world, force, persona) {
   return { stance: STANCES[1] };
 }
 export const TRANSFER_RACES = {
-  modern: ['인간(전이자)', '인간(전이자)', '인간(전이자)', '전이 중 변이된 몸'],
-  other: ['엘프', '마족', '인간화한 드래곤', '이세계의 용사', '이세계의 마왕', '고블린'],
+  modern: [
+    N_('Human (transmigrator)'),
+    N_('Human (transmigrator)'),
+    N_('Human (transmigrator)'),
+    N_('A body mutated in transit'),
+  ],
+  other: [
+    N_('Elf'),
+    N_('Demon'),
+    N_('Dragon in human form'),
+    N_('Hero from another world'),
+    N_('Demon King from another world'),
+    N_('Goblin'),
+  ],
 };
 export const RACES = {
-  vrmmo: ['인간 유저', '인간 유저', '엘프 유저', '수인 유저', '자아가 생긴 NPC', '버그 캐릭터'],
-  academy: ['인간', '인간', '엘프', '수인', '혼혈', '마족 교환학생'],
-  tower: ['인간', '인간', '수인', '요정', '거인족', '탑의 원주민'],
-  apoc: ['인간', '인간', '인간', '변이 인간', '감염 면역자', '기계 개조인'],
-  palace: ['인간', '인간', '인간', '여우 요괴', '반신'],
-  fantasy: ['인간', '인간', '인간', '엘프', '드워프', '수인', '하프오크', '마족'],
-  murim: ['인간', '인간', '인간', '요괴', '반요', '영수'],
-  hunter: ['인간(비각성자)', '인간(비각성자)', '인간(각성 체질)', '게이트 몬스터', '혼혈 각성체'],
-  cyber: ['인간', '인간', '사이보그', '안드로이드', '각성한 AI', '변이체'],
-  monster: ['슬라임', '고블린', '리치', '미믹', '드래곤 해츨링', '곰팡이 군체', '언데드'],
-  rofan: ['인간(귀족)', '인간(평민)', '인간(평민)', '요정', '흑마법 혈통', '용족 혼혈'],
+  vrmmo: [
+    N_('Human player'),
+    N_('Human player'),
+    N_('Elf player'),
+    N_('Beastkin player'),
+    N_('An NPC who became self-aware'),
+    N_('Bugged character'),
+  ],
+  academy: [N_('Human'), N_('Human'), N_('Elf'), N_('Beastkin'), N_('Half-blood'), N_('Demon exchange student')],
+  tower: [N_('Human'), N_('Human'), N_('Beastkin'), N_('Fairy'), N_('Giant'), N_('Native of the tower')],
+  apoc: [
+    N_('Human'),
+    N_('Human'),
+    N_('Human'),
+    N_('Mutant human'),
+    N_('Immune to the infection'),
+    N_('Mechanically modified human'),
+  ],
+  palace: [N_('Human'), N_('Human'), N_('Human'), N_('Fox spirit'), N_('Demigod')],
+  fantasy: [N_('Human'), N_('Human'), N_('Human'), N_('Elf'), N_('Dwarf'), N_('Beastkin'), N_('Half-orc'), N_('Demon')],
+  murim: [N_('Human'), N_('Human'), N_('Human'), N_('Yokai'), N_('Half-yokai'), N_('Spirit beast')],
+  hunter: [
+    N_('Human (unawakened)'),
+    N_('Human (unawakened)'),
+    N_('Human (awakening-prone)'),
+    N_('Gate monster'),
+    N_('Half-blood awakened'),
+  ],
+  cyber: [N_('Human'), N_('Human'), N_('Cyborg'), N_('Android'), N_('Awakened AI'), N_('Mutant')],
+  monster: [
+    N_('Slime'),
+    N_('Goblin'),
+    N_('Lich'),
+    N_('Mimic'),
+    N_('Dragon hatchling'),
+    N_('Mold colony'),
+    N_('Undead'),
+  ],
+  rofan: [
+    N_('Human (noble)'),
+    N_('Human (commoner)'),
+    N_('Human (commoner)'),
+    N_('Fairy'),
+    N_('Black magic bloodline'),
+    N_('Half-dragon'),
+  ],
 };
 export const ORIGINS = {
-  EX: ['마왕', '선택받은 용사', '창세신의 후예', '시스템 관리자'],
+  EX: [N_('Demon King'), N_('The chosen hero'), N_('Descendant of the creator god'), N_('System administrator')],
   SSS: [
-    '국내 1위 길드의 상속자',
-    '마교 소교주',
-    '북부 대공가의 외동',
-    '고대 드래곤',
-    '메가코프 이사회 의장의 클론',
-    '황제의 적자',
-    '군주종의 마지막 알',
-    '재벌 3세',
-    '대현자의 마지막 제자',
+    N_("Heir to the nation's top guild"),
+    N_('Young master of the Demonic Cult'),
+    N_('Only child of the Northern Grand Duke'),
+    N_('Ancient dragon'),
+    N_("Clone of a megacorp's board chair"),
+    N_("The emperor's legitimate heir"),
+    N_('Last egg of a sovereign species'),
+    N_('Third-generation chaebol heir'),
+    N_("The great sage's last disciple"),
   ],
-  S: ['공작가 후계자', '대형 길드장의 양자', '성녀', 'S급 헌터', '마계 공작의 사생아', '대마법사의 제자', '상급 마족'],
-  A: ['백작가 자제', '명문 정파 제자', 'A급 각성자', '기사단장의 아들', '궁정 마법사 견습'],
-  B: ['남작가 막내', '용병', '상인의 아들', '견습 기사', '모험가 길드 신입'],
-  C: ['평민', '농부의 자식', '마을 사냥꾼', '여관 종업원', '하급 병사'],
-  D: ['고아', '빈민가 소매치기', '떠돌이 약장수', '파산한 상인의 자식'],
-  E: ['노예', '광산 노역수', '빚에 팔려 온 아이', '시한부 병자', '저주받은 아이'],
-  F: ['이세계 슬라임', '고블린 새끼', '허수아비', '마을 개'],
+  S: [
+    N_('Heir to a ducal house'),
+    N_('Adopted child of a major guild master'),
+    N_('Saintess'),
+    N_('S-rank hunter'),
+    N_('Illegitimate child of a demon duke'),
+    N_('Apprentice of an archmage'),
+    N_('High demon'),
+  ],
+  A: [
+    N_("Child of a count's house"),
+    N_('Disciple of a renowned orthodox sect'),
+    N_('A-rank awakened'),
+    N_('Son of a knight commander'),
+    N_('Apprentice court mage'),
+  ],
+  B: [
+    N_("Youngest of a baron's house"),
+    N_('Mercenary'),
+    N_("Merchant's son"),
+    N_('Squire'),
+    N_("Adventurers' Guild rookie"),
+  ],
+  C: [N_('Commoner'), N_("Farmer's child"), N_('Village hunter'), N_('Inn worker'), N_('Low-ranking soldier')],
+  D: [N_('Orphan'), N_('Slum pickpocket'), N_('Wandering medicine peddler'), N_('Child of a bankrupt merchant')],
+  E: [N_('Slave'), N_('Mine convict'), N_('Child sold to pay a debt'), N_('Terminally ill'), N_('Cursed child')],
+  F: [N_('Otherworld slime'), N_('Goblin whelp'), N_('Scarecrow'), N_('Village dog')],
 };
 export const TALENTS = {
   EX: [
-    ['인과율 조작', '하루 한 번, 방금 일어난 일의 결과를 다시 굴린다'],
-    ['세계의 총애', '치명적 위기를 한 번 무효로 만든다'],
-    ['관리자 권한', 'ADMIN과 직접 대화하고 거래할 수 있다'],
+    [N_('Causality Manipulation'), N_('Once a day, reroll the outcome of what just happened')],
+    [N_('Beloved of the World'), N_('Cancels one fatal crisis')],
+    [N_('Admin Privileges'), N_('Can talk and trade with ADMIN directly')],
   ],
   SSS: [
-    ['결말 감각', '선택지 하나의 결과가 흐릿하게 미리 보인다'],
-    ['절대 재능', '모든 숙련도 상승 속도 5배'],
-    ['황금손', '손대는 거래마다 이득이 따른다'],
+    [N_('Sense of Endings'), N_('Faintly foresees the outcome of one choice')],
+    [N_('Absolute Talent'), N_('All proficiency grows 5x faster')],
+    [N_('Golden Touch'), N_('Every deal you touch turns a profit')],
   ],
   S: [
-    ['광전사', '궁지에 몰릴수록(HP 30% 아래) 판정이 크게 유리해진다'],
-    ['검술 천재', '한 번 본 검초를 몸이 기억한다'],
-    ['마나 친화', '마력 회복이 비정상적으로 빠르다'],
+    [N_('Berserker'), N_('The more cornered you are (HP under 30%), the more checks favor you')],
+    [N_('Sword Genius'), N_('Your body remembers any sword form it sees once')],
+    [N_('Mana Affinity'), N_('Mana recovers abnormally fast')],
   ],
   A: [
-    ['첫인상', '처음 만난 NPC의 태도가 한 단계 부드럽다'],
-    ['빠른 성장', '경험치 획득량 2배'],
-    ['행운아', '작은 운이 자주 따른다'],
+    [N_('First Impression'), N_('NPCs you meet for the first time are one step friendlier')],
+    [N_('Fast Growth'), N_('Double experience')],
+    [N_('Lucky One'), N_('Small luck follows you often')],
   ],
   B: [
-    ['강철 체질', '병과 독에 강하다'],
-    ['손재주', '무엇이든 금방 고친다'],
-    ['눈치', '거짓말을 어렴풋이 알아챈다'],
+    [N_('Iron Constitution'), N_('Resistant to illness and poison')],
+    [N_('Handy'), N_('Fixes anything in no time')],
+    [N_('Perceptive'), N_('Vaguely senses lies')],
   ],
   C: [
-    ['성실함', '꾸준히 하면 조금씩 는다'],
-    ['평범한 건강', '잔병치레가 없다'],
-    ['잔재주', '요리와 청소를 잘한다'],
+    [N_('Diligence'), N_('Improves little by little with steady work')],
+    [N_('Ordinary Health'), N_('Never catches minor illnesses')],
+    [N_('Knacks'), N_('Good at cooking and cleaning')],
   ],
   D: [
-    ['불면증', '밤에 깨어 있지만 늘 피곤하다'],
-    ['둔감', '통증을 덜 느끼지만 위험도 늦게 알아챈다'],
-    ['겁쟁이', '도망칠 때만 발이 빨라진다'],
+    [N_('Insomnia'), N_('Awake at night but always tired')],
+    [N_('Dull Senses'), N_('Feels less pain, but notices danger late')],
+    [N_('Coward'), N_('Fast on your feet only when running away')],
   ],
   E: [
-    ['저주받은 운', '중요한 순간마다 운이 나쁘다'],
-    ['허약 체질', '최대 HP가 쉽게 줄어든다'],
-    ['기억 상실', '과거를 떠올리지 못한다'],
+    [N_('Cursed Luck'), N_('Bad luck at every important moment')],
+    [N_('Frail Constitution'), N_('Max HP drops easily')],
+    [N_('Amnesia'), N_('Cannot recall the past')],
   ],
   F: [
-    ['끈질김', '죽음 판정 한 번을 중상으로 바꾼다(한 생에 1회)'],
-    ['존재감 제로', '아무도 당신을 신경 쓰지 않는다'],
-    ['잡초', '밟혀도 다음 날이면 일어난다. 회복만 빠르다'],
+    [N_('Tenacity'), N_('Turns one death into a grave wound (once a life)')],
+    [N_('Zero Presence'), N_('No one pays you any attention')],
+    [N_('Weed'), N_('Trampled today, back up tomorrow. Only your recovery is fast')],
   ],
 };
-// others: 골드 ×1
+// others: gold x1
 const CURRENCY = {
-  hunter: ['원', 1000],
-  academy: ['원', 1000],
-  cyber: ['크레딧', 10],
-  apoc: ['배급표', 1],
-  murim: ['냥', 1],
-  palace: ['냥', 1],
+  hunter: [N_('won'), 1000],
+  academy: [N_('won'), 1000],
+  cyber: [N_('credits'), 10],
+  apoc: [N_('ration tickets'), 1],
+  murim: [N_('nyang'), 1],
+  palace: [N_('nyang'), 1],
 };
 export function currencyOf(wid) {
-  return CURRENCY[wid] || ['골드', 1];
+  return CURRENCY[wid] || [N_('gold'), 1];
+}
+export function moneyText(n, wid, lang = uiLang()) {
+  return tIn(lang, '{amount} {unit}', {
+    amount: Number(n || 0).toLocaleString(locale(lang)),
+    unit: tIn(lang, currencyOf(wid)[0]),
+  });
 }
 export const BASE = {
   EX: { hp: 999, power: 120000, gold: 50000 },
@@ -263,23 +340,45 @@ export const BASE = {
   E: { hp: 50, power: 10, gold: 0 },
   F: { hp: 10, power: 3, gold: 0 },
 };
+// k: the Korean command, a[0]: the English one; both work when typed, cmdName(id) shows the screen's
+// i18n-ignore-start: command names a Korean player types
 export const CMDS = [
-  { k: '/뉴스', a: ['/news'], t: 'news', d: '세계의 소식지' },
-  { k: '/의뢰', a: ['/quest', '/q'], t: 'quest', d: '의뢰 게시판' },
-  { k: '/갤', a: ['/board', '/gallery', '/dc'], t: 'gallery', d: '커뮤니티 게시판' },
+  { id: 'news', k: '/뉴스', a: ['/news'], t: 'news', d: N_("The world's newspaper") },
+  { id: 'quest', k: '/의뢰', a: ['/quest', '/q'], t: 'quest', d: N_('Quest board') },
+  { id: 'board', k: '/갤', a: ['/board', '/gallery', '/dc'], t: 'gallery', d: N_('Community board') },
   {
+    id: 'star',
     k: '/성좌',
     a: ['/star', '/성좌갤'],
     t: 'gallery',
-    d: '성좌들의 관전 갤러리 (성좌가 있는 삶, 채널이 열린 뒤)',
-    preset:
-      '성좌 갤러리. 이 플레이어의 채널을 보는 성좌들(별자리 이름의 관전자들)이 글과 댓글로 후원, 조롱, 내기를 건다. 사이트명은 세계관에 맞게.',
+    d: N_("The constellations' viewing gallery (in a life with constellations, after the channel opens)"),
+    preset: N_(
+      "A constellation gallery. The constellations watching this player's channel (spectators named after star signs) sponsor, mock and place bets in posts and comments. Name the site to suit the world.",
+    ),
   },
-  { k: '/톡', a: ['/chat', '/talk', '/dm'], t: 'messenger', d: '메신저로 메시지 보내기' },
-  { k: '/판정', a: ['/why', '/근거'], t: 'judge', d: '판정 근거 묻기 (시간 안 흐름)' },
-  { k: '/스킬', a: ['/skill', '/skills', '/기술'], t: 'skills', d: 'ADMIN에게 스킬 목록과 비용 듣기 (시간 안 흐름)' },
-  { k: '/상태', a: ['/status', '/st'], t: 'status', d: '상태창 열기' },
+  { id: 'chat', k: '/톡', a: ['/chat', '/talk', '/dm'], t: 'messenger', d: N_('Send a message on the messenger') },
+  {
+    id: 'why',
+    k: '/판정',
+    a: ['/why', '/근거'],
+    t: 'judge',
+    d: N_('Ask why a check went the way it did (no time passes)'),
+  },
+  {
+    id: 'skill',
+    k: '/스킬',
+    a: ['/skill', '/skills', '/기술'],
+    t: 'skills',
+    d: N_('Hear your skills and their costs from ADMIN (no time passes)'),
+  },
+  { id: 'status', k: '/상태', a: ['/status', '/st'], t: 'status', d: N_('Open the status window') },
 ];
+// i18n-ignore-end
+
+export const cmdName = id => {
+  const c = CMDS.find(x => x.id === id);
+  return isKo() ? c.k : c.a[0];
+};
 
 export const EMOS = [
   'neutral',
@@ -308,10 +407,19 @@ export const EMO_FB = {
   surprise: 'neutral',
   anger: 'serious',
 };
-export const REALMS = ['미입문', '삼류', '이류', '일류', '절정', '초절정', '화경', '현경', '생사경'];
+export const REALMS = [
+  N_('Unranked'),
+  N_('Third-rate'),
+  N_('Second-rate'),
+  N_('First-rate'),
+  N_('Peak'),
+  N_('Transcendent'),
+  N_('Harmony'),
+  N_('Mystic'),
+  N_('Life and Death'),
+];
 const REALM_START = { EX: 6, SSS: 4, S: 3, A: 2, B: 1 };
 const NEIGONG_START = { EX: 120, SSS: 60, S: 20, A: 10, B: 3 };
-export const ART_SLOTS = ['검법', '심법', '경공', '기타'];
 const EMO_KO = {
   중립: 'neutral',
   기본: 'neutral',
@@ -362,14 +470,21 @@ export function normGender(g) {
   if (/^(male|남|남성|남자|m)$/.test(g)) return 'male';
   return g ? 'other' : null;
 }
-export const SUB_STATS = [
-  ['con', '체력'],
-  ['str', '근력'],
-  ['mag', '마력'],
-  ['agi', '민첩'],
-  ['int', '지능'],
-  ['cha', '매력'],
-];
+export const STAT_LABEL = {
+  power: N_('Combat power'),
+  gold: N_('Money'),
+  fame: N_('Fame'),
+  age: N_('Age'),
+  maxHp: N_('Max HP'),
+  neigong: N_('Inner energy (yrs)'),
+  con: N_('Constitution'),
+  str: N_('Strength'),
+  mag: N_('Magic'),
+  agi: N_('Agility'),
+  int: N_('Intelligence'),
+  cha: N_('Charm'),
+};
+export const SUB_STATS = ['con', 'str', 'mag', 'agi', 'int', 'cha'].map(k => [k, STAT_LABEL[k]]);
 const SUB_BONUS = { EX: 12, SSS: 8, S: 5, A: 3, B: 1, C: 0, D: 0, E: -1, F: -2 };
 export function rollSubStats(tier) {
   const o = {};
@@ -433,9 +548,9 @@ export const COMMAND_TYPES = {
   judge: {
     screen: true,
     browse: true,
-    ask: { prompt: 'cmdJudge', q: '방금 판정은 왜 이렇게 됐나', head: '판정 근거' },
+    ask: { prompt: 'cmdJudge', q: N_('Why did the last check go this way?'), head: N_('Why the check went this way') },
   },
-  skills: { screen: true, browse: true, ask: { prompt: 'cmdSkills', q: '', head: '스킬 목록' } },
+  skills: { screen: true, browse: true, ask: { prompt: 'cmdSkills', q: '', head: N_('Skills') } },
   status: {},
 };
 export const cmdIs = (cmd, trait) => !!(cmd && COMMAND_TYPES[cmd.type] && COMMAND_TYPES[cmd.type][trait]);

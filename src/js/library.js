@@ -6,6 +6,7 @@ import { app } from './app.js';
 import { saveSettings } from './settings.js';
 import { logErr } from './diag.js';
 import { imgUrl } from './images.js';
+import { T } from './i18n.js';
 
 export let imgError = '';
 export const SETDOC = k => platform.shared.doc(`sets/${k}`);
@@ -205,7 +206,7 @@ export const IMGX = {
           noteIgnored('legacy images: delete an old document', e);
         }
       }
-      if (n) toast(`이미지 목록 정리 완료 (${n}건)`, 3000);
+      if (n) toast(T('Image list cleaned up ({n})', { n }), 3000);
     })();
   },
 };
@@ -223,7 +224,7 @@ export async function loadImages() {
     try {
       const legacy = await IMGX.legacyAll();
       if (legacy.length) {
-        toast('이미지 목록 형식을 정리하는 중...', 4000);
+        toast(T('Updating the image list format...'), 4000);
         await IMGX.migrate(legacy);
         app.images = await IMGX.load();
       }
@@ -237,9 +238,9 @@ export async function loadImages() {
     try {
       const m = await findManifestAsset();
       if (m) {
-        toast('복제본 이미지 목록을 복원하는 중...', 4000);
+        toast(T("Restoring this copy's image list..."), 4000);
         const hit = await restoreFromManifest(m.data);
-        if (hit) toast(`이미지 ${hit}장 목록 복원 완료`, 4000);
+        if (hit) toast(T('Restored {n} {n|image|images} to the list', { n: hit }), 4000);
       }
     } catch (e) {
       noteIgnored('images: restore from manifest', e);
@@ -255,7 +256,7 @@ export async function loadImages() {
         app.images = old;
         const q2 = await userCol('sets/items').limit(1000).get();
         for (const d of q2.docs) await SETDOC(d.id).set(d.data());
-        toast(`이미지 목록 ${old.length}건을 공유 영역으로 옮겼어요`);
+        toast(T('Moved {n} image list {n|entry|entries} to the shared area', { n: old.length }));
       }
     } catch (e) {
       noteIgnored('images: move the private list to the shared one', e);
@@ -320,7 +321,7 @@ export async function migrateLegacy() {
     }
     app.settings = Object.assign(app.settings, st || {}, { migrated: true });
     await saveSettings();
-    if (n) toast(`이전 데이터 ${n}건을 옮겨왔어요`, 4000);
+    if (n) toast(T('Brought over {n} {n|item|items} of old data', { n }), 4000);
   } catch (e) {
     console.warn('migrate', e);
   }
@@ -356,7 +357,7 @@ export async function migrateWorldLabels() {
   }
   for (const x of app.images) if (Array.isArray(x.worlds) && x.worlds.some(old)) x.worlds = fix(x.worlds);
   await IMGX.flush(imgIds);
-  toast(`세계 라벨 정리: 세트 ${setKs.length}개, 이미지 ${imgIds.length}장`, 4000);
+  toast(T('World labels updated: {sets} sets, {imgs} images', { sets: setKs.length, imgs: imgIds.length }), 4000);
 }
 export async function findManifestAsset() {
   try {
@@ -390,7 +391,7 @@ export async function restoreFromManifest(m, onProgress = () => {}) {
     hit = 0;
   for (const a of list) {
     if (app.images.some(x => x.id === a.id)) continue;
-    onProgress(`${++n}/${list.length} 목록 복원 중`);
+    onProgress(T('Restoring the list {i}/{n}', { i: ++n, n: list.length }));
     try {
       const b = await (await fetch(a.url || imgUrl(a.id))).blob();
       const h = await sha256Hex(b);

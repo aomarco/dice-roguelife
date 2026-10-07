@@ -4,115 +4,200 @@ import { $, esc, IGNORED, noteIgnored, nowIso, toast } from './util.js';
 import { platform } from './db.js';
 import { app, APP_VERSION } from './app.js';
 import { saveSettings, setting, SETTING_DEFAULTS } from './settings.js';
+import { LANG_NAMES, langOptions, locale, N_, setUiLang, SOURCE_LANG, T, translateStatic, uiLang } from './i18n.js';
 import { ERRLOG } from './diag.js';
-import { growthLevel, lifeDiff, rule } from './rules.js';
+import { GROWTH_LEVELS, growthLevel, lifeDiff, rule } from './rules.js';
 import { closeSheet, openSheet } from './sheet.js';
-import { applyDiscreet, showTab } from './shell.js';
+import { activeTab, applyDiscreet, showTab } from './shell.js';
 import { audioInit, cueSkill } from './sound.js';
 import { charSets } from './images.js';
 import { renderStrip } from './status.js';
-import { captureWords, maskNames, renderLog } from './log.js';
+import { captureWords, maskNames, renderLog, syncInputHint } from './log.js';
+import { redrawNewLifeForm } from './new-life.js';
+import { redrawNoSample } from './boot.js';
 import { applyEnterHint, enterPref, setEnterPref, syncEnterTog } from './composer.js';
 import { openUpdateSheet } from './update.js';
 import { ADMIN_PERSONAS, promptStats, recentBudget, recentLine } from './prompt.js';
 
-// The ⚙ sheet. Most controls edit one key of app.settings (PLAIN_SETTINGS below); the rest are the model tier check,
-// the Enter key (kept per browser), capture mode, and read-only notes: the rules frozen into the open save, the
-// prompt size, the growth speed in effect, diagnostics and the recent errors.
 let lastTierCheck = null; // what the platform actually served for the tier we asked (a plan may substitute a cheaper one)
 
 export function openSettingsSheet() {
   openSheet(
-    `<h3>설정</h3>${settingsHtml()}<div class="row settings-actions"><button class="btn" data-close>닫기</button></div>`,
+    `<h3>${T('Settings')}</h3>${settingsHtml()}<div class="row settings-actions"><button class="btn" data-close>${T('Close')}</button></div>`,
   );
   bindSettings($('#sheetInner'));
 }
+const options = list => list.map(([v, label]) => `<option value="${v}">${T(label)}</option>`).join('');
+const tierProbeHtml = c =>
+  T('Last check: asked for {asked} → <b>{applied}</b> served ({at})', {
+    asked: esc(c.asked),
+    applied: esc(c.applied),
+    at: c.at,
+  });
 function settingsHtml() {
-  return `<div class="row verrow"><span class="muted">버전 v${esc(APP_VERSION)}</span><button class="btn ghost" id="updBtn" type="button">업데이트 확인</button></div>
-    <div class="row"><div class="field grow"><label for="tierSel">서술 모델</label><select id="tierSel"><option value="quick">빠름 (quick)</option><option value="default">기본 (default)</option><option value="complex">깊이 있게 (complex)</option></select></div>
-    <div class="field grow"><label for="lenSel">서술 분량</label><select id="lenSel"><option value="short">짧게</option><option value="normal">모델에 맡김</option><option value="long">길게</option></select></div></div>
-    <p class="muted tier-probe"><span id="tierProbe">${lastTierCheck ? `마지막 확인: ${lastTierCheck.asked} 요청 → <b>${lastTierCheck.applied}</b> 적용 (${lastTierCheck.at})` : '서술 모델은 플랜에 따라 낮은 티어로 대체될 수 있어요.'}</span><button class="btn ghost chip-sm" id="tierCheck">지금 확인</button></p>
-    <div class="field recent-field"><label for="recentSel">최근 기억 (원문으로 넣는 분량, 그 이전은 요약)</label><select id="recentSel"><option value="20000">작게 (20KB)</option><option value="40000">보통 (40KB, 기본)</option><option value="80000">크게 (80KB)</option><option value="150000">아주 크게 (150KB)</option></select><p class="muted recent-note"><span id="recentNow">${recentLine()}</span>턴이 짧으면 더 많은 턴이, 길면 적은 턴이 들어가요. 150KB면 응답이 느려지고 한도에 걸릴 수 있어요.</p></div>
-    <div class="row lang-row"><div class="field grow"><label for="langSel">플레이 언어</label><select id="langSel"><option value="ko">한국어</option><option value="en">English</option><option value="ja">日本語</option></select></div>
-    <label class="row opt lang-tip"><input type="checkbox" id="langTip"> 내 입력 문장 교정 보기</label></div>
-    <label class="row opt settings-opt"><input type="checkbox" id="discreet"> 은밀 모드: 제목이 Claude로 바뀌고 이미지, 상태창, 색, 소리를 숨겨요 (제목 세 번 탭으로도 전환)</label>
-    <div id="discreetNav" class="row discreet-nav hidden"><button class="btn" data-go="play">플레이</button><button class="btn" data-go="saves">저장</button><button class="btn" data-go="memory">기억</button><button class="btn" data-go="images">이미지</button><button class="btn" data-go="hall">전당</button></div>
-    <div class="field settings-field"><label for="adminSel">ADMIN 페르소나</label><select id="adminSel">${Object.entries(
+  const langLabel = uiLang() === SOURCE_LANG ? 'Language' : `${T('Language')} · Language`;
+  return `<div class="row verrow"><span class="muted">${T('Version v{version}', { version: esc(APP_VERSION) })}</span><button class="btn ghost" id="updBtn" type="button">${T('Check for updates')}</button></div>
+    <div class="field ui-lang-field"><label for="uiLangSel">${langLabel}</label><select id="uiLangSel">${langOptions()}</select></div>
+    <div class="row"><div class="field grow"><label for="tierSel">${T('Narration model')}</label><select id="tierSel">${options(
+      [
+        ['quick', N_('Fast (quick)')],
+        ['default', N_('Standard (default)')],
+        ['complex', N_('Deep (complex)')],
+      ],
+    )}</select></div>
+    <div class="field grow"><label for="lenSel">${T('Narration length')}</label><select id="lenSel">${options([
+      ['short', N_('Short')],
+      ['normal', N_('Up to the model')],
+      ['long', N_('Long')],
+    ])}</select></div></div>
+    <p class="muted tier-probe"><span id="tierProbe">${lastTierCheck ? tierProbeHtml(lastTierCheck) : T('Your plan may substitute a lower tier for the narration model.')}</span><button class="btn ghost chip-sm" id="tierCheck">${T('Check now')}</button></p>
+    <div class="field recent-field"><label for="recentSel">${T('Recent memory (how much goes in word for word; older turns are summarized)')}</label><select id="recentSel">${options(
+      [
+        ['20000', N_('Small (20KB)')],
+        ['40000', N_('Medium (40KB, default)')],
+        ['80000', N_('Large (80KB)')],
+        ['150000', N_('Very large (150KB)')],
+      ],
+    )}</select><p class="muted recent-note"><span id="recentNow">${recentLine()}</span>${T('Short turns fit more, long turns fewer. At 150KB replies slow down and may hit the limit.')}</p></div>
+    <div class="row lang-row"><div class="field grow"><label for="langSel">${T('Story language')}</label><select id="langSel"><option value="">${T('Same as the screen')}</option>${langOptions(Object.keys(LANG_NAMES))}</select></div>
+    <label class="row opt lang-tip"><input type="checkbox" id="langTip"> ${T('Show corrections of my input')}</label></div>
+    <label class="row opt settings-opt"><input type="checkbox" id="discreet"> ${T('Discreet mode: the title becomes Claude, and images, the status window, colors and sounds are hidden (or tap the title three times)')}</label>
+    <div id="discreetNav" class="row discreet-nav hidden">${[
+      ['play', N_('Play')],
+      ['saves', N_('Saves')],
+      ['memory', N_('Memory')],
+      ['images', N_('Images')],
+      ['hall', N_('Hall')],
+    ]
+      .map(([go, label]) => `<button class="btn" data-go="${go}">${T(label)}</button>`)
+      .join('')}</div>
+    <div class="field settings-field"><label for="adminSel">${T('ADMIN persona')}</label><select id="adminSel">${Object.entries(
       ADMIN_PERSONAS(),
     )
       .map(([k, v]) => `<option value="${k}">${esc(v.name)}</option>`)
       .join('')}</select></div>
-    <div class="field admin-custom hidden" id="adminCustomBox"><label for="adminCustom">ADMIN 설명 (직접 입력)</label><textarea id="adminCustom" rows="4" maxlength="600" placeholder="예: ADMIN은 은퇴한 마왕이다. 플레이어를 '후계자 후보'라 부르며...">${esc(app.settings.adminCustom || '')}</textarea></div>
-    <div class="field settings-field"><label for="enterSel">엔터 키 (이 브라우저에만 저장)</label><select id="enterSel"><option value="auto">자동 (PC는 보내기, 폰은 줄바꿈)</option><option value="always">엔터로 보내기, Shift+Enter 줄바꿈</option><option value="never">엔터는 줄바꿈, Shift+Enter로 보내기</option></select></div>
-    <label class="row opt settings-opt after-field"><input type="checkbox" id="knowGuard"> 외부 지식 억제: 현실, 전생, 캐릭터 출신 세계의 지식이 한 번에 힘이나 돈이 되지 않고, 약할 때는 벽에 막히다가 성장할수록 풀려요</label>
-    <label class="row opt settings-opt after-field"><input type="checkbox" id="gambler"> 도박꾼의 초석: 매 턴 잭팟(무조건 성공+큰 보상) 또는 나락(무조건 실패+큰 페널티)이 뜰 수 있어요</label>
-    <div class="field gambler-odds"><label for="gamblerP">잭팟, 나락 각각의 확률</label><select id="gamblerP"><option value="0.1">10%씩 (둘 합쳐 20%)</option><option value="0.15">15%씩 (둘 합쳐 30%)</option><option value="0.25">25%씩 (둘 합쳐 50%)</option></select></div>
+    <div class="field admin-custom hidden" id="adminCustomBox"><label for="adminCustom">${T('ADMIN description (write your own)')}</label><textarea id="adminCustom" rows="4" maxlength="600" placeholder="${esc(T("e.g. ADMIN is a retired demon king who calls the player 'successor candidate'..."))}">${esc(app.settings.adminCustom || '')}</textarea></div>
+    <div class="field settings-field"><label for="enterSel">${T('Enter key (saved in this browser only)')}</label><select id="enterSel">${options(
+      [
+        ['auto', N_('Auto (sends on PC, new line on phones)')],
+        ['always', N_('Enter sends, Shift+Enter for a new line')],
+        ['never', N_('Enter adds a new line, Shift+Enter sends')],
+      ],
+    )}</select></div>
+    <label class="row opt settings-opt after-field"><input type="checkbox" id="knowGuard"> ${T("Limit outside knowledge: knowledge from the real world, a past life or the character's home world never turns into power or money in one go; it hits walls while you are weak and opens up as you grow")}</label>
+    <label class="row opt settings-opt after-field"><input type="checkbox" id="gambler"> ${T("Gambler's Stone: any turn can roll a jackpot (sure success + a big reward) or a doom (sure failure + a big penalty)")}</label>
+    <div class="field gambler-odds"><label for="gamblerP">${T('Chance of a jackpot, and of a doom')}</label><select id="gamblerP">${options(
+      [
+        ['0.1', N_('10% each (20% together)')],
+        ['0.15', N_('15% each (30% together)')],
+        ['0.25', N_('25% each (50% together)')],
+      ],
+    )}</select></div>
     <div class="field cap-box">
-      <label class="row opt"><input type="checkbox" id="capOn"> 캡처 모드: 화면에서만 이름을 가려요 (기록은 그대로)</label>
-      <div class="row cap-row"><select id="capMode"><option value="blur">모자이크</option><option value="alias">다른 이름으로</option></select><input id="capAlias" placeholder="{user}" maxlength="12" class="cap-alias"></div>
-      <input id="capWords" placeholder="가릴 단어 (쉼표로). 비우면 캐릭터 이름 자동" class="cap-words">
+      <label class="row opt"><input type="checkbox" id="capOn"> ${T('Capture mode: hides names on screen only (the record is unchanged)')}</label>
+      <div class="row cap-row"><select id="capMode">${options([
+        ['blur', N_('Blur')],
+        ['alias', N_('Another name')],
+      ])}</select><input id="capAlias" placeholder="{user}" maxlength="12" class="cap-alias"></div>
+      <input id="capWords" placeholder="${esc(T("Words to hide (comma-separated). Empty: the character's name"))}" class="cap-words">
     </div>
-    <div class="field settings-field"><label for="statusSel">상태창 공개</label><select id="statusSel"><option value="auto">자동: 시스템이 있는 세계는 각성 후 공개</option><option value="always">항상 공개</option><option value="awaken">모든 세계에서 각성 후 공개</option><option value="never">숨김: 각성해도 숫자 없음, 서사로만</option></select></div>
-    <div class="field settings-field"><label for="growthSel">성장 속도 (스탯을 얼마나 후하게 줄지)</label><select id="growthSel"><option value="auto">자동: 세계 난이도와 ADMIN 성격에 따라</option><option value="stingy">짠맛: 큰 계기에만, 같은 스탯은 8턴 쿨다운</option><option value="normal">보통</option><option value="generous">후함: 상한 1.5배</option></select><p class="muted field-note" id="growthNow"></p></div>
-    <div class="field settings-field near"><label for="questSel">의뢰 스타일</label><select id="questSel"><option value="board">길드 게시판 (나무판에 종이)</option><option value="ui">게임 퀘스트 창 (다크, 금테)</option></select></div>
-    <div class="field settings-field near"><label for="newsSel">뉴스 스타일</label><select id="newsSel"><option value="broadcast">방송 뉴스 (남색 헤더)</option><option value="paper">종이 신문 (세리프)</option></select></div>
-    <label class="row opt settings-opt"><input type="checkbox" id="wdark"> 톡, 게시판 위젯도 다크 모드로 (기본은 카톡 노랑, 갤 흰색)</label>
-    <label class="row opt settings-opt"><input type="checkbox" id="soundOn"> 효과음 (운명 공개, 경지 상승과 칭호 팡파레, 스킬, 아이템과 소지금, 의뢰 완료, 사망, 결산)</label>
-    <details class="diag-box"><summary class="muted">진단</summary><div id="diag" class="muted diag-body">확인 중...</div></details>
-    <details class="diag-box"><summary class="muted">최근 오류 ${ERRLOG.length ? `(${ERRLOG.length})` : ''}</summary><div class="diag-body diag-log">${ERRLOG.map(e => `[${e.t}] ${e.stage} ${e.code} ${esc(e.msg)}${e.text ? '\n  → ' + esc(e.text) : ''}`).join('\n\n') || '없음'}</div></details>
-    <details class="diag-box"><summary class="muted">넘어간 오류 ${IGNORED.length ? `(${IGNORED.length})` : ''}</summary><div class="diag-body diag-log">${IGNORED.map(e => `[${e.t}] ${esc(e.where)}: ${esc(e.msg)}`).join('\n') || '없음'}</div></details>
-    <p class="muted settings-help">서술 모델: 빠름은 가볍고 빠르게, 깊이 있게는 가장 강한 모델로 씁니다.<br>서술 분량: 기본은 모델이 알아서 정해요.<br>플레이 언어: 서술, 대사, 선택지, 위젯이 모두 이 언어로 나와요.<br>입력 문장 교정: 내가 쓴 문장의 맞춤법과 문법을 한 줄로 고쳐 보여줘요 (한국어는 맞춤법과 띄어쓰기, 영어와 일본어는 문법과 어휘).<br>모두 다음 턴부터 적용돼요.</p>`;
+    <div class="field settings-field"><label for="statusSel">${T('Status window numbers')}</label><select id="statusSel">${options(
+      [
+        ['auto', N_('Auto: in worlds with a system, after awakening')],
+        ['always', N_('Always shown')],
+        ['awaken', N_('After awakening, in every world')],
+        ['never', N_('Hidden: no numbers even after awakening, story only')],
+      ],
+    )}</select></div>
+    <div class="field settings-field"><label for="growthSel">${T('Growth pace (how generous stat growth is)')}</label><select id="growthSel">${options(
+      [
+        ['auto', N_("Auto: by the world's difficulty and ADMIN's personality")],
+        ['stingy', N_('Stingy: only at big moments, 8-turn cooldown per stat')],
+        ['normal', N_('Normal')],
+        ['generous', N_('Generous: 1.5x caps')],
+      ],
+    )}</select><p class="muted field-note" id="growthNow"></p></div>
+    <div class="field settings-field near"><label for="questSel">${T('Quest style')}</label><select id="questSel">${options(
+      [
+        ['board', N_('Guild board (paper on wood)')],
+        ['ui', N_('Game quest window (dark, gold trim)')],
+      ],
+    )}</select></div>
+    <div class="field settings-field near"><label for="newsSel">${T('News style')}</label><select id="newsSel">${options(
+      [
+        ['broadcast', N_('TV news (navy header)')],
+        ['paper', N_('Newspaper (serif)')],
+      ],
+    )}</select></div>
+    <label class="row opt settings-opt"><input type="checkbox" id="wdark"> ${T('Dark mode for messenger and board widgets too (default: yellow chat, white board)')}</label>
+    <label class="row opt settings-opt"><input type="checkbox" id="soundOn"> ${T('Sound effects (fate reveal, realm and title fanfares, skills, items and money, quest complete, death, Life Review)')}</label>
+    <details class="diag-box"><summary class="muted">${T('Diagnostics')}</summary><div id="diag" class="muted diag-body">${T('Checking...')}</div></details>
+    <details class="diag-box"><summary class="muted">${T('Recent errors')} ${ERRLOG.length ? `(${ERRLOG.length})` : ''}</summary><div class="diag-body diag-log">${ERRLOG.map(e => `[${e.t}] ${e.stage} ${e.code} ${esc(e.msg)}${e.text ? '\n  → ' + esc(e.text) : ''}`).join('\n\n') || T('None')}</div></details>
+    <details class="diag-box"><summary class="muted">${T('Skipped errors')} ${IGNORED.length ? `(${IGNORED.length})` : ''}</summary><div class="diag-body diag-log">${IGNORED.map(e => `[${e.t}] ${esc(e.where)}: ${esc(e.msg)}`).join('\n') || T('None')}</div></details>
+    <p class="muted settings-help">${T('Narration model: Fast is light and quick; Deep uses the strongest model.<br>Narration length: by default the model decides.<br>Story language: narration, dialogue, choices and widgets all come in this language.<br>Input corrections: shows one line fixing what you wrote (spelling and spacing for Korean, grammar and word choice for English and Japanese).<br>All take effect from the next turn.')}</p>`;
 }
 async function runDiag(el) {
   const out = [];
-  out.push(`버전: v${APP_VERSION}`);
-  out.push(`호스트: ${host().id}`);
-  out.push(`저장 경로: ${platform.userPath}`);
+  out.push(T('Version: v{version}', { version: APP_VERSION }));
+  out.push(T('Host: {id}', { id: host().id }));
+  out.push(T('Save path: {path}', { path: platform.userPath }));
   out.push(
-    `기능: db ${!!(platform.db && !platform.memMode)}, sample ${!!platform.sample}, assets ${!!platform.assets}, user ${!!platform.user}`,
+    T('Capabilities: {list}', {
+      list: `db ${!!(platform.db && !platform.memMode)}, sample ${!!platform.sample}, assets ${!!platform.assets}, user ${!!platform.user}`,
+    }),
   );
   out.push(
-    `모드: ${platform.memMode ? '미리보기(저장 안 됨)' : platform.localMode ? '이 기기에만 저장' : '서버 저장'}`,
+    T('Mode: {mode}', {
+      mode: platform.memMode
+        ? T('Preview (not saved)')
+        : platform.localMode
+          ? T('This device only')
+          : T('Saved on the server'),
+    }),
   );
   try {
     if (platform.user) {
-      out.push(`소유자: ${await platform.user.isOwner()}`);
-      out.push(`공유 데이터 쓰기: ${await platform.user.can('data.write')}`);
-      out.push(`이미지 쓰기: ${await platform.user.can('assets.write')}`);
-    } else out.push('사용자 정보 없음');
+      out.push(T('Owner: {v}', { v: await platform.user.isOwner() }));
+      out.push(T('Shared data write: {v}', { v: await platform.user.can('data.write') }));
+      out.push(T('Image write: {v}', { v: await platform.user.can('assets.write') }));
+    } else out.push(T('No user info'));
   } catch (e) {
-    out.push('권한 확인 실패: ' + (e.code || e.message));
+    out.push(T('Permission check failed: {err}', { err: e.code || e.message }));
   }
   try {
     await platform.shared.doc('images/_probe').set({ t: nowIso() });
     await platform.shared.doc('images/_probe').delete();
-    out.push('이미지 목록 쓰기: 성공');
+    out.push(T('Image list write: OK'));
   } catch (e) {
-    out.push('이미지 목록 쓰기: 실패 (' + (e.code || e.message) + ')');
+    out.push(T('Image list write: failed ({err})', { err: e.code || e.message }));
   }
   try {
     await platform.shared.doc('sets/_probe').set({ t: nowIso() });
     await platform.shared.doc('sets/_probe').delete();
-    out.push('세트 쓰기: 성공');
+    out.push(T('Set write: OK'));
   } catch (e) {
-    out.push('세트 쓰기: 실패 (' + (e.code || e.message) + ')');
+    out.push(T('Set write: failed ({err})', { err: e.code || e.message }));
   }
   out.push(
-    `이미지 ${app.images.length}장, 세트 ${Object.keys(charSets()).length}개, 세트 정보 ${Object.keys(app.setMeta).length}개`,
+    T('{images} images, {sets} sets, {cards} set cards', {
+      images: app.images.length,
+      sets: Object.keys(charSets()).length,
+      cards: Object.keys(app.setMeta).length,
+    }),
   );
   if (el) el.textContent = out.join('\n');
 }
 
-// One control per setting. The control shows the stored value (or its default, settings.js), unless `show` says
-// otherwise, and `parse` turns what the control holds back into the stored value.
-// `apply` runs right after the change (before the save), and `saved` is the toast once it is saved.
-const NEXT_TURN = '저장됨. 다음 턴부터';
+// One control per setting: `show` maps the stored value to the control, `parse` back, `apply` runs before the save,
+// `saved` is the toast's English (translated when shown).
+const NEXT_TURN = N_('Saved. From the next turn');
+const SAVED = N_('Saved');
 const redrawLog = () => {
   if (app.state) renderLog('keep');
 };
 const PLAIN_SETTINGS = [
-  { id: 'tierSel', key: 'tier', saved: '저장됨' },
-  { id: 'lenSel', key: 'len', saved: '저장됨' },
+  { id: 'tierSel', key: 'tier', saved: SAVED },
+  { id: 'lenSel', key: 'len', saved: SAVED },
   {
     id: 'recentSel',
     key: 'recentBytes',
@@ -121,7 +206,13 @@ const PLAIN_SETTINGS = [
     apply: q => showRecentNow(q),
     saved: NEXT_TURN,
   },
-  { id: 'langSel', key: 'lang', saved: '저장됨. 다음 턴부터 적용' },
+  {
+    id: 'langSel',
+    key: 'lang',
+    show: v => v || '',
+    parse: v => v || null,
+    saved: NEXT_TURN,
+  },
   { id: 'langTip', key: 'langTip' },
   {
     id: 'discreet',
@@ -140,9 +231,13 @@ const PLAIN_SETTINGS = [
     },
     saved: NEXT_TURN,
   },
-  { id: 'adminCustom', key: 'adminCustom', show: v => v || '', parse: v => v.trim(), saved: '저장됨' },
+  { id: 'adminCustom', key: 'adminCustom', show: v => v || '', parse: v => v.trim(), saved: SAVED },
   { id: 'knowGuard', key: 'knowledgeGuard', show: v => v !== false, saved: NEXT_TURN },
-  { id: 'gambler', key: 'gambler', saved: v => (v ? '도박꾼의 초석 켬. 다음 턴부터' : '도박꾼의 초석 끔') },
+  {
+    id: 'gambler',
+    key: 'gambler',
+    saved: v => (v ? N_("Gambler's Stone on. From the next turn") : N_("Gambler's Stone off")),
+  },
   { id: 'gamblerP', key: 'gamblerP', parse: Number },
   {
     id: 'statusSel',
@@ -157,13 +252,13 @@ const PLAIN_SETTINGS = [
     id: 'questSel',
     key: 'questStyle',
     apply: redrawLog,
-    saved: '저장됨',
+    saved: SAVED,
   },
   {
     id: 'newsSel',
     key: 'newsStyle',
     apply: redrawLog,
-    saved: '저장됨',
+    saved: SAVED,
   },
   { id: 'wdark', key: 'wdark', apply: () => applyDiscreet() },
   {
@@ -181,6 +276,7 @@ const PLAIN_SETTINGS = [
 function bindSettings(root) {
   const q = id => root.querySelector('#' + id);
   for (const c of PLAIN_SETTINGS) bindPlainSetting(q, c);
+  bindUiLang(q);
   showAdminCustom(q);
   bindTierCheck(q);
   bindDiscreetNav(q);
@@ -190,7 +286,9 @@ function bindSettings(root) {
   notePromptSize(q);
   showGrowthNow(q);
   q('updBtn').onclick = openUpdateSheet;
-  runDiag(q('diag'));
+  q('diag')
+    .closest('details')
+    .addEventListener('toggle', e => e.target.open && runDiag(q('diag')), { once: true });
 }
 function bindPlainSetting(q, { id, key, show, parse, apply, saved }) {
   const el = q(id);
@@ -205,12 +303,43 @@ function bindPlainSetting(q, { id, key, show, parse, apply, saved }) {
     try {
       await saveSettings();
     } catch (e) {
-      toast('저장 실패: ' + (e.code || e.message));
+      toast(T('Save failed: {err}', { err: e.code || e.message }));
       return;
     }
     const msg = typeof saved === 'function' ? saved(v) : saved;
-    if (msg) toast(msg);
+    if (msg) toast(T(msg));
   };
+}
+function bindUiLang(q) {
+  const el = q('uiLangSel');
+  el.value = uiLang();
+  el.onchange = () => {
+    const top = $('#sheetInner') ? $('#sheetInner').scrollTop : 0;
+    chooseUiLang(el.value);
+    openSettingsSheet();
+    if ($('#sheetInner')) $('#sheetInner').scrollTop = top;
+  };
+}
+// the player picks a screen language: kept in the settings and applied
+export function chooseUiLang(lang) {
+  app.settings.uiLang = lang;
+  applyUiLang(lang);
+  saveSettings().catch(e => noteIgnored('settings: save the screen language', e));
+}
+// redraws everything on screen; lines already saved keep the language they were written in
+export function applyUiLang(lang) {
+  setUiLang(lang);
+  translateStatic();
+  applyDiscreet();
+  redrawNoSample();
+  if ($('#log .newlife')) redrawNewLifeForm();
+  else if (app.state) {
+    renderStrip();
+    renderLog('keep');
+    syncInputHint();
+  }
+  const tab = activeTab();
+  if (tab !== 'play') showTab(tab);
 }
 function showAdminCustom(q) {
   q('adminCustomBox').classList.toggle('hidden', app.settings.adminPersona !== 'custom');
@@ -224,31 +353,38 @@ function showGrowthNow(q) {
   if (!el) return;
   const L = growthLevel();
   el.textContent = app.state
-    ? `지금 이 삶에선: ${L.name} (이번 삶 난이도 ${'★'.repeat(lifeDiff())}, ADMIN ${(ADMIN_PERSONAS()[setting('adminPersona')] || {}).name || ''})`
+    ? T('In this life: {growth} (difficulty {stars}, ADMIN {persona})', {
+        growth: T(L.name),
+        stars: '★'.repeat(lifeDiff()),
+        persona: (ADMIN_PERSONAS()[setting('adminPersona')] || {}).name || '',
+      })
     : '';
 }
 // asks for the chosen tier once and shows which tier the platform actually used
 function bindTierCheck(q) {
   q('tierCheck').onclick = async () => {
     if (!platform.sample) {
-      toast('Claude를 호출할 수 없어요');
+      toast(T("Can't call Claude"));
       return;
     }
     const b = q('tierCheck');
     b.disabled = true;
-    b.textContent = '확인 중';
+    b.textContent = T('Checking');
     try {
       const asked = setting('tier');
       const r = await platform.sample('Reply with the single word ok.', { modelTier: asked, cache: false });
-      lastTierCheck = { asked, applied: (r && r.modelTierApplied) || '?', at: new Date().toLocaleTimeString() };
-      q('tierProbe').innerHTML =
-        `마지막 확인: ${lastTierCheck.asked} 요청 → <b>${esc(lastTierCheck.applied)}</b> 적용 (${lastTierCheck.at})`;
-      toast(`${lastTierCheck.asked} 요청 → ${lastTierCheck.applied} 적용`);
+      lastTierCheck = {
+        asked,
+        applied: (r && r.modelTierApplied) || '?',
+        at: new Date().toLocaleTimeString(locale()),
+      };
+      q('tierProbe').innerHTML = tierProbeHtml(lastTierCheck);
+      toast(T('Asked for {asked} → {applied} served', lastTierCheck));
     } catch (e) {
-      toast('확인 실패: ' + (e.code || e.message));
+      toast(T('Check failed: {err}', { err: e.code || e.message }));
     }
     b.disabled = false;
-    b.textContent = '지금 확인';
+    b.textContent = T('Check now');
   };
 }
 // in discreet mode the tab bar is hidden, so the sheet offers the tabs
@@ -279,7 +415,9 @@ function bindCapture(q) {
   q('capMode').value = c.mode || 'blur';
   q('capAlias').value = c.alias || '';
   q('capWords').value = c.words || '';
-  q('capWords').placeholder = `가릴 단어 (쉼표로). 비우면 캐릭터 이름 자동 (${captureWords().length}개)`;
+  q('capWords').placeholder = T("Words to hide (comma-separated). Empty: the character's name ({n})", {
+    n: captureWords().length,
+  });
   const save = async () => {
     c.on = q('capOn').checked;
     c.mode = q('capMode').value;
@@ -300,9 +438,12 @@ function bindCapture(q) {
 function noteFrozenRules(q) {
   if (!app.state) return;
   const FROZEN = {
-    growth: ['growthSel', v => ({ auto: '자동', stingy: '짠맛', normal: '보통', generous: '후함' })[v || 'auto']],
-    knowledgeGuard: ['knowGuard', v => (v === false ? '끔' : '켬')],
-    gambler: ['gambler', v => (v ? '켬 (' + Math.round((Number(rule('gamblerP')) || 0.15) * 100) + '%)' : '끔')],
+    growth: ['growthSel', v => T((GROWTH_LEVELS[v] || { name: N_('Auto') }).name)],
+    knowledgeGuard: ['knowGuard', v => (v === false ? T('Off') : T('On'))],
+    gambler: [
+      'gambler',
+      v => (v ? T('On ({n}%)', { n: Math.round((Number(rule('gamblerP')) || 0.15) * 100) }) : T('Off')),
+    ],
   };
   for (const [k, [id, label]] of Object.entries(FROZEN)) {
     const el = q(id);
@@ -310,7 +451,7 @@ function noteFrozenRules(q) {
     const host = el.closest('label,.field') || el.parentElement;
     const n = document.createElement('p');
     n.className = 'muted frozen-note';
-    n.textContent = `지금 저장: ${label(rule(k))} (시작 때 고정, 바꾸면 새 저장부터)`;
+    n.textContent = T('This save: {value} (fixed at the start; changes apply to new saves)', { value: label(rule(k)) });
     host.after(n);
   }
 }
@@ -319,7 +460,14 @@ function notePromptSize(q) {
   el.className = 'muted prompt-size';
   const n = promptStats.length;
   el.textContent = n
-    ? `프롬프트 크기: 최근 턴 약 ${promptStats[n - 1].toLocaleString()}토큰, 최근 ${n}턴 평균 약 ${Math.round(promptStats.reduce((a, b) => a + b, 0) / n).toLocaleString()}토큰 (추정)`
-    : '프롬프트 크기: 이번 접속에서 아직 턴이 없어요';
+    ? T(
+        'Prompt size: last turn about {last} tokens, average of the last {n} {n|turn|turns} about {avg} tokens (estimate)',
+        {
+          last: promptStats[n - 1].toLocaleString(locale()),
+          n,
+          avg: Math.round(promptStats.reduce((a, b) => a + b, 0) / n).toLocaleString(locale()),
+        },
+      )
+    : T('Prompt size: no turns yet in this session');
   q('growthSel').closest('.field').after(el);
 }

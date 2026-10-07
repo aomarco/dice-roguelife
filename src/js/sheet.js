@@ -1,5 +1,6 @@
 /* ============ sheet: the bottom sheet and the questions asked in it ============ */
 import { $, esc } from './util.js';
+import { T } from './i18n.js';
 
 let dlgResolve = null;
 export function openSheet(html, opts = {}) {
@@ -33,16 +34,16 @@ export function answerDialog(value) {
 export function askReview(title, pairs) {
   // a checklist before a bulk change: unchecked rows are left alone
   const answer = openDialog(
-    `<p class="dlg-msg pre">${esc(title)}</p><div class="review-list">${pairs.map(([a, b], i) => `<label class="row review-item"><input type="checkbox" data-rv="${i}" checked class="review-check"> <span>${esc(a)} → <b>${esc(b)}</b></span></label>`).join('')}</div><div class="row actions"><button class="btn primary" id="rvOk">적용</button><button class="btn ghost" id="rvNo">취소</button></div>`,
+    `<p class="dlg-msg pre">${esc(title)}</p><div class="review-list">${pairs.map(([a, b], i) => `<label class="row review-item"><input type="checkbox" data-rv="${i}" checked class="review-check"> <span>${esc(a)} → <b>${esc(b)}</b></span></label>`).join('')}</div><div class="row actions"><button class="btn primary" id="rvOk">${T('Apply')}</button><button class="btn ghost" id="rvNo">${T('Cancel')}</button></div>`,
   );
   $('#rvOk').onclick = () =>
     answerDialog([...document.querySelectorAll('[data-rv]')].filter(c => c.checked).map(c => pairs[+c.dataset.rv]));
   $('#rvNo').onclick = () => answerDialog(null);
   return answer;
 }
-export let askConfirm = function askConfirm(msg, ok = '확인') {
+export let askConfirm = function askConfirm(msg, ok = T('OK')) {
   const answer = openDialog(
-    `<p class="dlg-msg pre confirm">${esc(msg)}</p><div class="row"><button class="btn primary" id="dlgOk">${esc(ok)}</button><button class="btn ghost" id="dlgNo">취소</button></div>`,
+    `<p class="dlg-msg pre confirm">${esc(msg)}</p><div class="row"><button class="btn primary" id="dlgOk">${esc(ok)}</button><button class="btn ghost" id="dlgNo">${T('Cancel')}</button></div>`,
   );
   $('#dlgOk').onclick = () => answerDialog(true);
   $('#dlgNo').onclick = () => answerDialog(false);
@@ -50,7 +51,7 @@ export let askConfirm = function askConfirm(msg, ok = '확인') {
 };
 export let askPrompt = function askPrompt(msg, def = '') {
   const answer = openDialog(
-    `<p class="dlg-msg">${esc(msg)}</p><input id="dlgIn" class="btn dlg-field" value="${esc(def)}"><div class="row"><button class="btn primary" id="dlgOk">확인</button><button class="btn ghost" id="dlgNo">취소</button></div>`,
+    `<p class="dlg-msg">${esc(msg)}</p><input id="dlgIn" class="btn dlg-field" value="${esc(def)}"><div class="row"><button class="btn primary" id="dlgOk">${T('OK')}</button><button class="btn ghost" id="dlgNo">${T('Cancel')}</button></div>`,
   );
   const inp = $('#dlgIn');
   inp.focus();

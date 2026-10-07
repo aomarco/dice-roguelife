@@ -19,6 +19,7 @@ import { Script } from 'node:vm';
 import { unzipSync, zipSync } from 'fflate';
 import { PAGE, ROOT, build, writePage } from './build.js';
 import { scanFiles } from './comment-scan.js';
+import { check as checkI18n } from './i18n-check.js';
 
 const OUT = process.env.OUT_DIR || join(ROOT, 'dist');
 const RELEASED = join(ROOT, 'tools', '.released_prompt.json');
@@ -108,6 +109,7 @@ async function check(js) {
   // a '//' comment that swallowed code on its line passes syntax and lint, so look for it
   const hits = scanFiles(jsFiles(LINTED));
   if (hits.length) die('code inside a line comment\n  ' + hits.join('\n  '));
+  if (!checkI18n()) die('translation check failed (node tools/i18n-check.js --list)');
 }
 
 function runTests(page) {

@@ -4,6 +4,7 @@ import { EMOS, normGender } from './data.js';
 import { platform } from './db.js';
 import { app } from './app.js';
 import { logErr } from './diag.js';
+import { T } from './i18n.js';
 import { IMGX } from './library.js';
 import { LIMITS } from './limits.js';
 import { charSets, charSetsAll, fitsWorld, genderOf, pickEmotion } from './images.js';
@@ -220,7 +221,7 @@ function spellFix(tag) {
 export async function toEnglishTags(list) {
   list = list.map(t => {
     const f = spellFix(t);
-    if (f !== t) toast(`${t} → ${f} (철자 교정)`, 3500);
+    if (f !== t) toast(T('{from} → {to} (spelling fixed)', { from: t, to: f }), 3500);
     return f;
   });
   const need = list.filter(t => !isIdTag(t) && /[^\x00-\x7F]/.test(t));
@@ -228,6 +229,7 @@ export async function toEnglishTags(list) {
   const voc = tagVocab(80);
   try {
     const r = await platform.sample.json(
+      // i18n-ignore: Korean examples for the translator
       `Translate each appearance tag to a short lowercase English keyword, using the most common word (e.g. 정장 -> suit, 교복 -> school uniform, 은발 -> silver hair, 갑옷 -> armor). Keep proper nouns (sect, faction, place or person names such as 남만야수궁) exactly as written.${voc.length ? ` If one of these existing tags means the same thing, use it exactly: ${voc.join(', ')}.` : ''} Reply with only a JSON array of strings in the same order.\n${JSON.stringify(need)}`,
       { modelTier: 'quick' },
     );
@@ -556,7 +558,10 @@ function castExtra(who) {
   // the extra pool is empty (every extra face died, no silhouettes): a passer-by goes without a portrait rather than spending a lead's face. More images fix this, so say so once per life
   if (!app.state.faceOut) {
     app.state.faceOut = true;
-    toast('엑스트라에게 줄 얼굴이 다 떨어졌어요. 그림자(shadow_)나 엑스트라 이미지를 더 올리면 다시 붙어요.', 6000);
+    toast(
+      T('Out of faces for extras. Upload more silhouettes (shadow_) or extra images and they will get faces again.'),
+      6000,
+    );
   }
   return null;
 }

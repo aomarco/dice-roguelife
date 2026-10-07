@@ -1,10 +1,24 @@
 /* ============ log rendering ============ */
 import { $, esc, fmt, MARK_RE, stripMarks, toast } from './util.js';
-import { currencyOf, EMO_FB, normEmo } from './data.js';
+import { T, tIn } from './i18n.js';
+import { storyLang } from './settings.js';
+import { cmdName, EMO_FB, moneyText, normEmo, STAT_LABEL } from './data.js';
 import { withWeekday } from './calendar.js';
 import { platform } from './db.js';
 import { app, exclusive, waitingForReply } from './app.js';
-import { critOf, ODDS_RE, PIVOTAL_RE, statusVisible, TITLES_MAX, titlesOn } from './rules.js';
+import { critOf, statusVisible, TITLES_MAX, titlesOn } from './rules.js';
+import {
+  isCheckLine,
+  isPivotal,
+  isStarHead,
+  isWorldHead,
+  matchOdds,
+  stripOdds,
+  stripWorldPrefix,
+  sysKind as sysKindOf,
+  sysTag,
+  titleGained,
+} from './reply-words.js';
 import { charSetsAll, imgById, imgUrl, sceneHtml, turnPeople } from './images.js';
 import { startNewLifeForm } from './new-life.js';
 import { loadEarlier, pushTurn } from './persistence.js';
@@ -40,19 +54,19 @@ export function renderLog(scroll = 'bottom') {
   const log = $('#log');
   const keep = log.scrollTop;
   if (!app.state) {
-    log.innerHTML = '<p class="muted pad">불러오는 중...</p>';
+    log.innerHTML = `<p class="muted pad">${T('Loading...')}</p>`;
     return;
   }
   const lastAi = [...app.turns].reverse().find(t => t.kind === 'ai');
   const first = app.turns[0];
   const more =
     first && first.i > 0 && !platform.memMode
-      ? `<div class="row log-more"><button class="btn ghost" id="moreBtn">이전 기록</button></div>`
+      ? `<div class="row log-more"><button class="btn ghost" id="moreBtn">${T('Earlier turns')}</button></div>`
       : '';
   const lastT = app.turns[app.turns.length - 1];
   const retry =
     !waitingForReply() && lastT && (lastT.kind === 'user' || (lastT.kind === 'system' && app.state.introText))
-      ? `<div class="row log-more"><button class="btn" id="retryBtn">다시 시도</button></div>`
+      ? `<div class="row log-more"><button class="btn" id="retryBtn">${T('Retry')}</button></div>`
       : '';
   log.innerHTML =
     more +
@@ -62,7 +76,7 @@ export function renderLog(scroll = 'bottom') {
       ? '<div class="turn"><div class="ai" id="liveBox">' +
         liveSceneHtml(app.turn) +
         '<div class="body">' +
-        (app.turn && app.turn.head ? `<div class="sysmsg turn-head"><span>[ ${app.turn.head} ]</span></div>` : '') +
+        (app.turn && app.turn.head ? `<div class="sysmsg turn-head"><span>[ ${T(app.turn.head)} ]</span></div>` : '') +
         '<p class="admin hidden" id="liveAdmin"><b>ADMIN</b><span></span></p><div class="narr" id="livePrev"></div><div class="typing"><i></i><i></i><i></i></div></div></div></div>'
       : '') +
     (app.state.dead && !waitingForReply() ? deathPanel() : '');
@@ -96,7 +110,8 @@ function inlineSys(h, cap = 2) {
   let personal = 0;
   h = h.replace(SYS_LINE_RE, (m, line) => {
     const raw = unesc(line);
-    const mine = /^\[/.test(raw) && !/^\[\s*(월드|전\s*세계|world|성좌)/i.test(raw); // world news and constellations always break in where they happen; only the player's own windows are capped
+    const head = raw.replace(/^\[\s*/, '');
+    const mine = /^\[/.test(raw) && !isWorldHead(head) && !isStarHead(head); // world news and constellations break in where they happen; only the player's own windows are capped
     if (mine) {
       if (personal >= cap) {
         over.push(raw);
@@ -231,18 +246,12 @@ export function watchCaptureMask() {
   }).observe(document.documentElement, { childList: true, subtree: true, characterData: true });
 }
 function choiceHtml(c) {
-  const m = ODDS_RE.exec(c);
+  const m = matchOdds(c);
   if (!m) return esc(c);
-  const big = PIVOTAL_RE.test(m[2] || '');
-  return `${esc(c.slice(0, m.index))}<span class="odds${big ? ' big' : ''}" title="${big ? '결정적 판정: 결과와 상관없이 주사위를 보여줘요' : '주사위로 판정해요'}">🎲${big ? '❗' : ''} ${m[1]}%</span>`;
+  const big = isPivotal(m.rest);
+  return `${esc(c.slice(0, m.index))}<span class="odds${big ? ' big' : ''}" title="${big ? T('Decisive check: the dice show whatever the result') : T('Decided by the dice')}">🎲${big ? '❗' : ''} ${m.p}%</span>`;
 }
 // three tiers by bracket: [ ] the player's own window, 【 】 an announcement the whole world hears, 〈 〉 a constellation speaking
-const SYS_TAG = [
-  [/칭호|업적/, 'TITLE'],
-  [/의뢰|퀘스트|제안/, 'QUEST'],
-  [/레벨|성장|진화|각성|합성|해금|경지/, 'LEVEL UP'],
-  [/보상|기연|획득/, 'REWARD'],
-];
 function sysHtml(m) {
   const raw = String(m || '')
     .trim()
@@ -252,23 +261,18 @@ function sysHtml(m) {
     .replace(/\s*[\]】〉》]$/, '')
     .replace(/^SYSTEM\s*[:：]\s*/i, '');
   const head = inner.split(/[:：\-]/)[0].trim();
-  if (/^【/.test(raw) || /^(월드\s*메시지|월드|전\s*세계|world)/i.test(head)) {
-    const body = inner.replace(/^(월드\s*메시지|월드|전\s*세계\s*공지|전\s*세계|world\s*message)\s*[:：\-]?\s*/i, '');
+  if (/^【/.test(raw) || isWorldHead(head)) {
+    const body = stripWorldPrefix(inner);
     return `<div class="world"><div class="h">WORLD MESSAGE</div><div class="b">${esc(body || inner)}</div></div>`;
   }
-  if (/^[〈《]/.test(raw) || /^성좌/.test(head)) return `<div class="star">〈 ${esc(inner)} 〉</div>`;
+  if (/^[〈《]/.test(raw) || isStarHead(head)) return `<div class="star">〈 ${esc(inner)} 〉</div>`;
   const kind = sysKind(m);
   let t = inner;
   const k = t.search(/[:：]/);
   if (k > 0 && k < 14) t = t.slice(0, k).trim() + ' : ' + t.slice(k + 1).trim();
-  const tag =
-    kind === 'sys-bad'
-      ? 'WARNING'
-      : kind === 'sys-good'
-        ? (SYS_TAG.find(([re]) => re.test(head)) || [0, 'REWARD'])[1]
-        : 'SYSTEM';
-  const tm = inner.match(/^칭호\s*획득\s*[:：]?\s*["'「『]?(.+?)["'」』]?$/);
-  const tfx = tm && titleFxOf(tm[1].trim());
+  const tag = kind === 'sys-bad' ? 'WARNING' : kind === 'sys-good' ? sysTag(head) || 'REWARD' : 'SYSTEM';
+  const title = titleGained(inner);
+  const tfx = title && titleFxOf(title.trim());
   return `<div class="win ${kind}" data-tag="${tag}">${esc(t)}${tfx ? `<div class="fx">${esc(tfx)}</div>` : ''}</div>`;
 }
 let fxContext = null; // the title effects in force while one turn is drawn (its own snapshot), else the live state
@@ -281,7 +285,7 @@ export function toggleTitle(t) {
     on.push(t);
   }
   app.state.titlesOn = on;
-  app.state.title = on[0] || '없음';
+  app.state.title = on[0] || '';
   return true;
 }
 function titleFxOf(name) {
@@ -294,9 +298,7 @@ function sysKind(m) {
   const head = String(m || '')
     .replace(/^[\s\[`]*(SYSTEM\s*[:：]\s*)?/i, '')
     .split(/[:：\-]/)[0];
-  if (/위기|경고|위험|추격|부상|실패|저주|사망|죽음|함정|포위/.test(head)) return 'sys-bad';
-  if (/제안|의뢰|퀘스트|보상|칭호|업적|각성|진화|레벨|성장|기연|합성|해금/.test(head)) return 'sys-good';
-  return '';
+  return sysKindOf(head);
 }
 export function adminFace(emo) {
   const imgs = charSetsAll().admin;
@@ -309,9 +311,9 @@ function adminLine(o) {
   return `<p class="admin">${f ? `<img class="adm" alt="" src="${imgUrl(f.id)}">` : ''}<b>ADMIN</b>${esc(o.admin)}</p>`;
 }
 const choiceRow = c =>
-  `<div class="crow"><button class="cedit" data-cedit="${esc(c)}" title="입력창에 넣어 고치기 (길게 누르기, 우클릭도 돼요)" aria-label="이 선택지를 입력창에 넣어 고치기">✎</button><button data-choice="${esc(c)}">${choiceHtml(c)}</button></div>`;
+  `<div class="crow"><button class="cedit" data-cedit="${esc(c)}" title="${T('Put it in the input box to edit (long-press or right-click works too)')}" aria-label="${T('Put this choice in the input box to edit')}">✎</button><button data-choice="${esc(c)}">${choiceHtml(c)}</button></div>`;
 // a choice copied into the box: the action without its odds, ready to extend. Sent unchanged it is still that choice; changed, it is free input
-export const INPUT_PH = '*상황설명*, *속마음*, 대사, 행동, /명령어';
+export const inputPh = () => T('*scene*, *thoughts*, speech, actions, /commands');
 let choiceHinted = false;
 const HINT_LS = 'dr:inputHint';
 function inputHintState() {
@@ -349,7 +351,7 @@ export function countInputHint() {
   syncInputHint();
 }
 function choiceToInput(c) {
-  const a = String(c).replace(ODDS_RE, '').trim();
+  const a = stripOdds(c).trim();
   const cur = input.value.replace(/\s+$/, '');
   input.value = cur ? cur + '\n' + a + ' ' : a + ' '; // below whatever is already typed
   fitInput();
@@ -368,7 +370,7 @@ function choiceToInput(c) {
     // browser storage may be unavailable (private mode): the hint just shows again
   }
   choiceHinted = true; // the hint once per browser
-  if (!seen) toast('입력창에 넣었어요. 고치면 자유 입력으로 판정돼요', 3500);
+  if (!seen) toast(T("It's in the input box. If you change it, it's judged as free input"), 3500);
 }
 // the roll belongs to the player's line just before this reply
 function turnRoll(t) {
@@ -379,18 +381,35 @@ function turnRoll(t) {
 }
 function rollWin(r) {
   const crit = critOf(r);
-  const label = r.ok ? (crit ? '대성공' : '성공') : crit ? '대실패' : '실패';
+  const label = r.ok ? (crit ? T('Critical success') : T('Success')) : crit ? T('Critical failure') : T('Failure');
   const cls = r.ok ? (crit ? 'sys-good' : '') : 'sys-bad';
-  const tip = `주사위는 1~100, 낮을수록 좋아요. 성공 확률 ${r.p}%면 ${r.p} 이하가 성공`;
+  const tip = T('The die is 1-100, lower is better. At a {p}% chance, {p} or less succeeds', { p: r.p });
+  const need = T('Needs {p} or less: 🎲 {d}', { p: r.p, d: r.d });
   const what = r.what ? `<div class="what">${esc(r.what)}</div>` : '';
   if (crit)
-    return `<div class="win big ${cls}" data-tag="CRITICAL" title="${tip}">${what}<div class="t">${r.ok ? '★ 대성공 ★' : '☠ 대실패 ☠'}</div><div class="n">${r.p} 이하 필요: 🎲 ${r.d}</div></div>`;
-  return `<div class="win ${cls}" data-tag="CHECK" title="${tip}">${what}${r.p} 이하 필요: 🎲 ${r.d} → ${label}</div>`;
+    return `<div class="win big ${cls}" data-tag="CRITICAL" title="${tip}">${what}<div class="t">${r.ok ? T('★ Critical success ★') : T('☠ Critical failure ☠')}</div><div class="n">${need}</div></div>`;
+  return `<div class="win ${cls}" data-tag="CHECK" title="${tip}">${what}${need} → ${label}</div>`;
 }
 const userHtml = x =>
   esc(x)
     .replace(/\*([^*\n]{1,300})\*/g, '<em class="thought">*$1*</em>')
     .replace(/(&quot;|“)([^&“”\n]{1,300}?)(&quot;|”)/g, '<span class="said">$1$2$3</span>');
+function chipLabel(k, v, t) {
+  const energy = t.snap && t.snap.energy ? t.snap.energy.name : T('Energy');
+  if (k === 'energy') return energy;
+  if (k === 'energyMax') return T('{name} max', { name: energy });
+  if (k === 'hp') return v > 0 ? T('♥ Healed') : 'HP';
+  return STAT_LABEL[k] ? T(STAT_LABEL[k]) : k;
+}
+// money and age are known to the character, so they show as amounts even before awakening; other stats stay arrows
+function chipValue(k, v, t, shown) {
+  if (!shown && k !== 'gold' && k !== 'age') return v > 0 ? '↑' : '↓';
+  const sign = v > 0 ? '+' : '';
+  if (k === 'gold')
+    return sign + moneyText(v, (((t.snap && t.snap.life) || (app.state && app.state.life) || {}).world || {}).id);
+  if (k === 'age') return T('{n} {n|yr|yrs}', { n: sign + fmt(v) });
+  return sign + fmt(v);
+}
 export function renderTurn(t, isLast) {
   fxContext = Object.assign({}, (app.state && app.state.titleFx) || {}, (t && t.snap && t.snap.titleFx) || {});
   try {
@@ -401,11 +420,7 @@ export function renderTurn(t, isLast) {
 }
 function renderTurnInner(t, isLast) {
   if (t.kind === 'user')
-    return `<div class="turn u"><p>${userHtml(
-      String(t.text || '')
-        .replace(ODDS_RE, '')
-        .trim() || t.text,
-    )}</p></div>`; // the roll is shown with the reply, in its result window
+    return `<div class="turn u"><p>${userHtml(stripOdds(t.text || '').trim() || t.text)}</p></div>`; // the roll is shown with the reply, in its result window
   if (t.kind === 'system') return `<p class="sysline">${esc(t.text)}</p>`;
   if (t.kind === 'ledger') return `<div class="turn">${ledgerCard(t.out, t.i)}</div>`;
   const o = t.out || {};
@@ -418,14 +433,13 @@ function renderTurnInner(t, isLast) {
   if (sc || rest.length) img = sceneHtml(sc, rest);
   const RS = o.reasons || {};
   const SV = statusVisible();
-  /* money and age are known to the character, so they show as amounts even before awakening; other stats stay arrows until then */
   const deltas =
     t.deltas &&
     Object.entries(t.deltas)
       .filter(([, v]) => v)
       .map(
         ([k, v]) =>
-          `<span class="${k === 'hp' && v > 0 ? 'heal' : k === 'energy' ? 'mana' : v > 0 ? 'up' : 'down'}${RS[k] ? ' why' : ''}" ${RS[k] ? `data-why="${esc(RS[k])}" role="button" tabindex="0" title="${esc(RS[k])}"` : ''}>${{ energy: t.snap && t.snap.energy ? t.snap.energy.name : '에너지', energyMax: (t.snap && t.snap.energy ? t.snap.energy.name : '에너지') + ' 최대', hp: v > 0 ? '♥ 회복' : 'HP', power: '전투력', gold: '소지금', fame: '명성', age: '나이', maxHp: '최대 HP', neigong: '내공(년)', str: '근력', con: '체력', agi: '민첩', int: '지능', cha: '매력', mag: '마력' }[k] || k} ${SV || k === 'gold' || k === 'age' ? (v > 0 ? '+' : '') + fmt(v) + (k === 'gold' ? currencyOf((((t.snap && t.snap.life) || (app.state && app.state.life) || {}).world || {}).id)[0] : k === 'age' ? '세' : '') : v > 0 ? '↑' : '↓'}</span>`,
+          `<span class="${k === 'hp' && v > 0 ? 'heal' : k === 'energy' ? 'mana' : v > 0 ? 'up' : 'down'}${RS[k] ? ' why' : ''}" ${RS[k] ? `data-why="${esc(RS[k])}" role="button" tabindex="0" title="${esc(RS[k])}"` : ''}>${esc(chipLabel(k, v, t))} ${esc(chipValue(k, v, t, SV))}</span>`,
       )
       .join('');
   const ck = t.clock;
@@ -434,24 +448,24 @@ function renderTurnInner(t, isLast) {
       ? `<div class="clock">D+${ck.day} | ${[ck.date && withWeekday(ck.date), ck.time, ck.weather, ck.place].filter(Boolean).map(esc).join(' | ')}</div>`
       : '';
   if (o.judge)
-    return `<div class="turn"><div class="ai judge"><div class="body"><div class="sysmsg turn-head"><span>[ ${o.judge === 'skills' ? '스킬 목록' : '판정 근거'} ]</span></div><div class="narr judge-narr">${narrHtml(o.narration)}</div>
+    return `<div class="turn"><div class="ai judge"><div class="body"><div class="sysmsg turn-head"><span>[ ${o.judge === 'skills' ? T('Skills') : T('Why the check went this way')} ]</span></div><div class="narr judge-narr">${narrHtml(o.narration)}</div>
     ${isLast && !app.state.dead && o.choices && o.choices.length ? `<div class="choices">${o.choices.map(choiceRow).join('')}</div>` : ''}</div></div></div>`;
   const er = t.errata
-    ? `<details class="objection"><summary>⚖ 정정: ${esc(t.errata.fact || '')}</summary>${t.errata.q ? `<div class="oq">질문: ${esc(t.errata.q)}</div>` : ''}<div class="oq">이 기록은 그대로 두고, 바로잡은 내용은 그 뒤 상태에 반영했어요.</div></details>`
+    ? `<details class="objection"><summary>${T('⚖ Correction: {fact}', { fact: esc(t.errata.fact || '') })}</summary>${t.errata.q ? `<div class="oq">${T('Question: {q}', { q: esc(t.errata.q) })}</div>` : ''}<div class="oq">${T('This record stays as it was; the fix was applied to the state after it.')}</div></details>`
     : '';
   const obj = t.objection
-    ? `<details class="objection"${isLast ? ' open' : ''}><summary>⚖ 이의 인정: ${esc(t.objection.fact || '')}</summary>${t.objection.q ? `<div class="oq">질문: ${esc(t.objection.q)}</div>` : ''}${t.objection.text ? `<div class="narr oj">${narrHtml(t.objection.text)}</div>` : ''}</details>`
+    ? `<details class="objection"${isLast ? ' open' : ''}><summary>${T('⚖ Objection upheld: {fact}', { fact: esc(t.objection.fact || '') })}</summary>${t.objection.q ? `<div class="oq">${T('Question: {q}', { q: esc(t.objection.q) })}</div>` : ''}${t.objection.text ? `<div class="narr oj">${narrHtml(t.objection.text)}</div>` : ''}</details>`
     : '';
   return `<div class="turn"><div class="ai">${img}<div class="body">${head}${obj}${er}
     ${o.admin ? adminLine(o) : ''}
-    ${o.narration ? `<div class="narr">${NW.html}</div>` : o.widget ? '' : '<p class="muted empty-reply">(빈 응답) 아래 다시 쓰기를 눌러 주세요</p>'}
+    ${o.narration ? `<div class="narr">${NW.html}</div>` : o.widget ? '' : `<p class="muted empty-reply">${T('(Empty reply) Press Rewrite below')}</p>`}
     ${o.lang_note ? `<p class="langnote">${esc(o.lang_note)}</p>` : ''}
     ${(() => {
       const seen = new Set((NW.sysShown || []).map(sysCore));
       const roll = turnRoll(t);
       const end = [...(o.system || []), ...(NW.sysOver || [])].filter(m => {
         const c = sysCore(m);
-        if (seen.has(c) || (roll && /^판정(대)?(성공|실패)/.test(c))) return false;
+        if (seen.has(c) || (roll && isCheckLine(c))) return false;
         seen.add(c);
         return true;
       });
@@ -463,9 +477,9 @@ function renderTurnInner(t, isLast) {
       deltas || (t.newSkills && t.newSkills.length) || (t.notes && t.notes.length)
         ? `<div class="deltas">${deltas || ''}${(t.newSkills || [])
             .filter(k => typeof k === 'string')
-            .map(k => `<span class="up">스킬 ${esc(k)}</span>`)
+            .map(k => `<span class="up">${T('Skill {name}', { name: esc(k) })}</span>`)
             .join('')}${(t.notes || [])
-            .filter(k => !/이하 필요/.test(k))
+            .filter(k => !/이하 필요/.test(k)) // roll notes saved before v2.5 (the roll window shows the roll)
             .map(
               k =>
                 `<span class="${k.startsWith('☠') ? 'down' : k.startsWith('★') || k.startsWith('✦') ? 'jack' : 'up'}">${esc(k)}</span>`,
@@ -475,7 +489,7 @@ function renderTurnInner(t, isLast) {
     }
     ${o.widget ? renderWidget(o.widget, t.i) : ''}
     ${isLast && !app.state.dead && ((o.choices && o.choices.length) || o.widget) ? `<div class="choices">${(o.choices || []).map(choiceRow).join('')}${widgetFollowups(o.widget)}</div>` : ''}
-    </div><div class="tools">${isLast && !waitingForReply() ? `<button data-reroll="${t.i}">다시 쓰기</button>` : ''}${turnPeople(t.img || {}, o).some(p => p.npc) ? `<button data-face="${t.i}">얼굴 바꾸기</button>` : ''}<button data-fork="${t.i}">여기서 분기</button></div></div></div>`;
+    </div><div class="tools">${isLast && !waitingForReply() ? `<button data-reroll="${t.i}">${T('Rewrite')}</button>` : ''}${turnPeople(t.img || {}, o).some(p => p.npc) ? `<button data-face="${t.i}">${T('Change face')}</button>` : ''}<button data-fork="${t.i}">${T('Branch here')}</button></div></div></div>`;
 }
 // the buttons a screen offers under itself (widgets.js), each sending its text or running its action (followUp)
 function widgetFollowups(w) {
@@ -493,8 +507,8 @@ export async function acceptQuest(btn) {
   if (!q) return;
   app.state.quests.push({ title: q.title, status: 'active', note: [q.client, q.reward].filter(Boolean).join(', ') });
   btn.disabled = true;
-  btn.textContent = '수락함';
-  await pushTurn({ kind: 'system', text: `의뢰 수락: ${q.title}` });
+  btn.textContent = T('Accepted');
+  await pushTurn({ kind: 'system', text: tIn(storyLang(), 'Quest accepted: {title}', { title: q.title }) });
   renderLog();
 }
 
@@ -510,7 +524,7 @@ const LOG_ACTIONS = {
   reroll: () => rerollWithReason(),
   fork: b => fork(+b.dataset.fork),
   accept: b => acceptQuest(b),
-  open: b => send(`/갤 "${b.dataset.open}" 글 열기`),
+  open: b => send(`${cmdName('board')} ${T('open "{title}"', { title: b.dataset.open })}`),
   hall: b => shareToHall(+b.dataset.hall),
   card: b => {
     const t = app.turns.find(x => x.i === +b.dataset.card);
@@ -534,7 +548,7 @@ function logButton(target, log) {
 }
 // a screen's follow-up: most send their line; reply and comment only start one in the input
 function followUp(act) {
-  const start = { reply: '/톡 ', comment: '/갤 댓글: ' }[act];
+  const start = { reply: cmdName('chat') + ' ', comment: `${cmdName('board')} ${T('comment:')} ` }[act];
   if (start === undefined) return send(act);
   input.value = start;
   input.focus();

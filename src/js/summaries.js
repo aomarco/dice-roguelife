@@ -4,7 +4,7 @@ import { platform } from './db.js';
 import { turnStore } from './turn-store.js';
 import { app } from './app.js';
 import { persist } from './persistence.js';
-import { fillTemplate, prompts, recentWindow, tbytes, turnText } from './prompt.js';
+import { fillTemplate, pr, prLang, recentWindow, tbytes, turnText } from './prompt.js';
 
 export async function maybeSummarize() {
   const lastI = app.state.next - 1;
@@ -25,8 +25,8 @@ export async function maybeSummarize() {
     const ctext = chunk.map(turnText).join('\n\n').slice(0, 40000);
     const nsent = Math.max(4, Math.min(12, Math.round(tbytes(ctext) / 4000)));
     const r = await platform.sample.json(
-      fillTemplate(prompts.summary, {
-        lang: app.settings.lang === 'en' ? 'in English' : app.settings.lang === 'ja' ? '日本語で' : '한국어',
+      fillTemplate(pr('summary'), {
+        lang: prLang('summaryLang'),
         n: `${nsent}~${nsent + 2}`,
         chunk: ctext,
       }),
@@ -44,7 +44,7 @@ export async function maybeSummarize() {
     if (app.state.summaries.length > 10) {
       const old = app.state.summaries.slice(0, 6);
       const r2 = await platform.sample.json(
-        fillTemplate(prompts.summaryMerge, { list: old.map(x => '- ' + x.text).join('\n') }),
+        fillTemplate(pr('summaryMerge'), { list: old.map(x => '- ' + x.text).join('\n') }),
         {
           modelTier: 'quick',
           cache: false,

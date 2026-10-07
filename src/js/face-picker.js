@@ -5,6 +5,7 @@ import { platform } from './db.js';
 import { turnStore } from './turn-store.js';
 import { app, isIdle } from './app.js';
 import { logErr } from './diag.js';
+import { T } from './i18n.js';
 import { closeSheet, openSheet } from './sheet.js';
 import { IMGX, SETDOC } from './library.js';
 import { charSets, charSetsAll, fitsWorld, genderOf, imgUrl, pickEmotion, setCover, turnPeople } from './images.js';
@@ -76,21 +77,21 @@ async function saveSetTags(k, fn) {
   try {
     await IMGX.flush(imgs.map(x => x.id));
   } catch (e) {
-    toast('저장 실패: ' + (e.code || e.message));
+    toast(T('Save failed: {err}', { err: e.code || e.message }));
   }
 }
 
 /* ---- drawing ---- */
 function pickerHtml(p) {
   const cf = p.cur && faceOf(p, p.cur);
-  return `<h3 class="fp-name">${esc(p.npc)}</h3><p class="muted sheet-lead">지금 얼굴: ${p.cur ? esc((app.setMeta[p.cur] || {}).charName || p.cur) : '없음'}. 고르면 이 턴과 앞으로의 턴에 적용돼요.</p>
+  return `<h3 class="fp-name">${esc(p.npc)}</h3><p class="muted sheet-lead">${T('Current face: {face}. Your pick applies to this turn and the turns after it.', { face: p.cur ? esc((app.setMeta[p.cur] || {}).charName || p.cur) : T('none') })}</p>
     ${cf ? `<img src="${imgUrl(cf.id)}" alt="" class="fp-cover">` : ''}
     <div id="castWhy" class="fp-why"></div>
-    <div class="row fp-tools"><button class="btn" id="castAuto">자동으로 다시 고르기</button>${p.cur ? `<button class="btn ghost" id="castOff">이 세트 제외</button>` : ''}<button class="btn ghost" id="castNone">얼굴 없이</button></div>
-    <p class="muted fp-hint">단서와 맞는 얼굴이 앞에 와요(✓ 개수). 이름표가 붙은 얼굴은 다른 인물이 쓰는 중이라 고르면 맞바꾸고, ✝ 표시는 세상을 떠난 인물의 얼굴이라 쓸 수 없어요.</p>
-    <input id="castQ" placeholder="이름, 역할, 태그로 찾기" class="fp-search">
+    <div class="row fp-tools"><button class="btn" id="castAuto">${T('Pick again automatically')}</button>${p.cur ? `<button class="btn ghost" id="castOff">${T('Retire this set')}</button>` : ''}<button class="btn ghost" id="castNone">${T('No face')}</button></div>
+    <p class="muted fp-hint">${T('Faces that match the clues come first (✓ count). A face with a name tag is in use by someone else, so picking it swaps the two; ✝ marks the face of someone who died and cannot be used.')}</p>
+    <input id="castQ" placeholder="${T('Search by name, role or tag')}" class="fp-search">
     <div id="castGrid" class="fp-grid"></div>
-    <div class="row actions"><button class="btn" data-close>닫기</button></div>`;
+    <div class="row actions"><button class="btn" data-close>${T('Close')}</button></div>`;
 }
 // the clues, and the current face's tags (green where a clue meets one): a tag can be removed, or added by typing
 function drawWhy(p) {
@@ -98,17 +99,19 @@ function drawWhy(p) {
   if (!box) return;
   const { cur, why, clues } = p;
   const hits = cur ? hitsOf(p, cur) : [];
-  box.innerHTML = `${why.ai ? `<div class="muted fp-why-head">${why.none ? 'AI가 맞는 얼굴이 없다고 판단했어요. 태그를 보강하거나 직접 골라 주세요.' : 'AI가 후보 중에서 이 인물의 얼굴을 골랐어요.'}</div>` : ''}<div class="fp-why-words"><span class="muted">이 인물의 단서:</span> ${clues.length ? clues.map(w => `<b class="fp-word${hits.includes(w) ? ' hit' : ''}">${esc(w)}</b>`).join('') : '<span class="muted">없음 (예전 턴이거나 내레이터가 외형을 안 줬어요)</span>'}</div>
+  box.innerHTML = `${why.ai ? `<div class="muted fp-why-head">${why.none ? T('The AI found no face that fits. Add tags or pick one yourself.') : T("The AI picked this person's face from the candidates.")}</div>` : ''}<div class="fp-why-words"><span class="muted">${T("This person's clues:")}</span> ${clues.length ? clues.map(w => `<b class="fp-word${hits.includes(w) ? ' hit' : ''}">${esc(w)}</b>`).join('') : `<span class="muted">${T("None (an older turn, or the narrator didn't describe their looks)")}</span>`}</div>
       ${
         cur
-          ? `<div class="fp-tags"><span class="muted">지금 얼굴의 태그 (맞은 건 초록):</span></div><div class="seg fp-tag-list">${tagsOf(
+          ? `<div class="fp-tags"><span class="muted">${T("Current face's tags (matches in green):")}</span></div><div class="seg fp-tag-list">${tagsOf(
               cur,
             )
               .map(
                 tag =>
                   `<button type="button" data-rmtag="${esc(tag)}" class="fp-tag${clues.some(w => wordSet([tag]).has(w)) ? ' hit' : ''}">${esc(tag)} ✕</button>`,
               )
-              .join('')}<input id="addTag" placeholder="+ 태그 (한국어는 영어로 바뀌어요)" class="fp-add-tag"></div>`
+              .join(
+                '',
+              )}<input id="addTag" placeholder="${T('+ tag (Korean is turned into English)')}" class="fp-add-tag"></div>`
           : ''
       }`;
   box.querySelectorAll('[data-rmtag]').forEach(
@@ -171,9 +174,9 @@ function drawGrid(p) {
         const o = owner(k);
         const rt = retired(k);
         const hits = hitsOf(p, k).length;
-        return `<button type="button" data-pick="${esc(k)}" ${rt ? 'disabled title="이 삶에서 세상을 떠난 인물의 얼굴이라 다시 쓸 수 없어요"' : ''} class="fp-cell"><img src="${imgUrl(f.id)}" loading="lazy" alt="" class="fp-thumb${o ? ' taken' : ''}">${o ? `<span class="fp-badge">${rt ? '✝ ' : ''}${esc(o)}</span>` : ''}<span class="fp-label">${esc(m.charName || k)}${hits ? ` <b class="fp-hits">✓${hits}</b>` : ''}</span></button>`;
+        return `<button type="button" data-pick="${esc(k)}" ${rt ? `disabled title="${T('The face of someone who died in this life; it cannot be used again')}"` : ''} class="fp-cell"><img src="${imgUrl(f.id)}" loading="lazy" alt="" class="fp-thumb${o ? ' taken' : ''}">${o ? `<span class="fp-badge">${rt ? '✝ ' : ''}${esc(o)}</span>` : ''}<span class="fp-label">${esc(m.charName || k)}${hits ? ` <b class="fp-hits">✓${hits}</b>` : ''}</span></button>`;
       })
-      .join('') || '<p class="muted empty">맞는 세트가 없어요.</p>';
+      .join('') || `<p class="muted empty">${T('No matching sets.')}</p>`;
   $('#castGrid')
     .querySelectorAll('[data-pick]:not([disabled])')
     .forEach(b => (b.onclick = () => applyFace(p, b.dataset.pick)));
@@ -188,7 +191,7 @@ async function applyFace(p, k) {
   if (other) {
     if (cur) app.state.cast[other] = cur;
     else delete app.state.cast[other];
-    toast(`${other}와(과) 얼굴을 맞바꿨어요`);
+    toast(T('Swapped faces with {name}', { name: other }));
   }
   if (k) app.state.cast[npc] = k;
   else delete app.state.cast[npc];
@@ -214,7 +217,7 @@ async function applyFace(p, k) {
   await persist();
   closeSheet();
   renderLog('keep');
-  if (!other) toast(`${npc}의 얼굴을 바꿨어요`);
+  if (!other) toast(T("Changed {name}'s face", { name: npc }));
 }
 // the person as the reply on this button describes them: the speaker, or one of the others present
 function personIn(p) {
@@ -247,7 +250,7 @@ async function retireSet(p) {
   }
   delete app.state.cast[npc];
   await applyFace(p, castFor(personIn(p)));
-  toast(`${cur}: 앞으로 배정되지 않아요`);
+  toast(T('{set}: will not be assigned from now on', { set: cur }));
 }
 // this person shows no face from now on
 async function noFace(p) {
@@ -303,19 +306,19 @@ async function translateClues(p) {
 export function changeFaceIn(ti) {
   try {
     if (!isIdle()) {
-      toast('답을 쓰는 중이에요. 끝나면 바꿀 수 있어요');
+      toast(T('A reply is being written. You can change it when it is done'));
       return;
     }
     const t = app.turns.find(x => x.i === ti);
     if (!t) {
-      toast('이 턴을 찾지 못했어요. 새로고침 후 다시 눌러 주세요');
+      toast(T("Couldn't find this turn. Reload and try again"));
       return;
     }
     const names = turnPeople(t.img || {}, t.out || {})
       .map(p => p.npc)
       .filter(Boolean);
     if (!names.length) {
-      toast('이 장면엔 바꿀 수 있는 얼굴이 없어요');
+      toast(T('No faces to change in this scene'));
       return;
     }
     if (names.length <= 1) {
@@ -323,7 +326,7 @@ export function changeFaceIn(ti) {
       return;
     }
     openSheet(
-      `<h3 class="sheet-title">누구의 얼굴을 바꿀까요?</h3><div class="choices">${names.map(n => `<button data-who="${esc(n)}">${esc(n)}</button>`).join('')}</div><div class="row who-actions"><button class="btn" data-close>닫기</button></div>`,
+      `<h3 class="sheet-title">${T('Whose face do you want to change?')}</h3><div class="choices">${names.map(n => `<button data-who="${esc(n)}">${esc(n)}</button>`).join('')}</div><div class="row who-actions"><button class="btn" data-close>${T('Close')}</button></div>`,
     );
     $('#sheetInner')
       .querySelectorAll('[data-who]')
@@ -335,13 +338,13 @@ export function changeFaceIn(ti) {
               openCast(x.dataset.who, t.i);
             } catch (e) {
               logErr('face', e);
-              toast('얼굴 고르기 창을 여는 중 문제가 생겼어요');
+              toast(T('Something went wrong opening the face picker'));
             }
           }),
       );
   } catch (e) {
     logErr('face', e);
-    toast('얼굴 고르기 창을 여는 중 문제가 생겼어요');
+    toast(T('Something went wrong opening the face picker'));
   }
 }
 export let openCast = async function openCast(npc, ti) {

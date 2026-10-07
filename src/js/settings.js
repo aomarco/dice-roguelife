@@ -1,6 +1,7 @@
 /* ============ settings: this player's preferences ============ */
 import { dset } from './db.js';
 import { app } from './app.js';
+import { uiLang } from './i18n.js';
 
 // app.settings holds them (loaded at boot from the 'settings' document). setting(key) reads one with its default
 // when it was never set, and saveSettings() writes them: one write at a time, in order, so an older copy never
@@ -8,7 +9,6 @@ import { app } from './app.js';
 export const SETTING_DEFAULTS = {
   tier: 'default', // the narrator's model tier
   len: 'normal', // reply length
-  lang: 'ko', // play language
   adminPersona: 'star',
   statusMode: 'auto', // when the status window shows numbers
   growth: 'auto', // how generous stat growth is
@@ -22,6 +22,14 @@ let loaded = false; // set once boot has read the stored settings: before that a
 
 export function setting(key) {
   return app.settings[key] || SETTING_DEFAULTS[key];
+}
+// the narrator's language; defaults to the screen's
+export function storyLang() {
+  return app.settings.lang || uiLang();
+}
+// a Japanese story reads the English prompt and is told to answer in Japanese (prompts.json "lang")
+export function promptLang() {
+  return storyLang() === 'ko' ? 'ko' : 'en';
 }
 export function settingsLoaded() {
   loaded = true;

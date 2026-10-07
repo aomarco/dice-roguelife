@@ -4,6 +4,8 @@ import { $, esc, noteIgnored, nowIso, toast } from './util.js';
 import { dget, loadWhitelist, memDB, platform, thaw, userCol } from './db.js';
 import { app } from './app.js';
 import { settingsLoaded } from './settings.js';
+import { okLang, T, uiLang } from './i18n.js';
+import { applyUiLang } from './settings-sheet.js';
 import { applyDiscreet } from './shell.js';
 import { loadImages, loadSets, migrateLegacy } from './library.js';
 import { startNewLifeForm } from './new-life.js';
@@ -13,20 +15,22 @@ import { loadPromptConfig } from './prompt.js';
 
 export async function boot() {
   setTimeout(() => {
-    if (!app.state && $('#log').textContent.includes('불러오는 중')) bootTrouble('불러오기가 너무 오래 걸려요. ');
+    if (!app.state && $('#log > p.muted.pad')) bootTrouble(T('Loading is taking too long. '));
   }, 12000);
   renderLog();
   try {
     await bootInner();
   } catch (e) {
     console.error(e);
-    bootTrouble(`시작 중 오류가 났어요: ${esc((e && (e.code || e.message)) || e)}<br>`);
+    bootTrouble(
+      T('Something went wrong while starting: {err}', { err: esc((e && (e.code || e.message)) || e) }) + '<br>',
+    );
   }
 }
 function bootTrouble(lead) {
   // the start went wrong or is taking too long: reload, or leave whatever was loading and start a new game
   $('#log').innerHTML =
-    `<div class="notice">${lead}<button class="btn boot-action" data-boot="reload">다시 시도</button> <button class="btn ghost boot-action" data-boot="new">새 게임으로</button></div>`;
+    `<div class="notice">${lead}<button class="btn boot-action" data-boot="reload">${T('Try again')}</button> <button class="btn ghost boot-action" data-boot="new">${T('Start a new game')}</button></div>`;
   $('#log [data-boot="reload"]').onclick = () => location.reload();
   $('#log [data-boot="new"]').onclick = () => {
     app.state = null;
@@ -39,10 +43,28 @@ export let useCapability = function useCapability(n) {
   return host().connect(n);
 };
 var sampleTries = 0;
+let noSampleKind = null; // 'waiting' | 'failed' while #noSample shows
+function showNoSample(kind) {
+  noSampleKind = kind;
+  const n = $('#noSample');
+  const retry = `<button class="btn inline-action" id="retrySample">${T('Reconnect to Claude')}</button>`;
+  n.innerHTML =
+    kind === 'waiting'
+      ? `${T('Not connected to Claude yet.')} ${retry}`
+      : `${T("This page can't call Claude. Check that you are signed in to Claude and try again.")} ${retry}` +
+        (sampleTries >= 2
+          ? `<br><span class="boot-note">${T("If it still doesn't work, send the contents of ⚙ → Diagnostics to the app's owner.")}</span>`
+          : '');
+  n.classList.remove('hidden');
+  $('#retrySample').onclick = ensureSample;
+}
+export function redrawNoSample() {
+  if (noSampleKind) showNoSample(noSampleKind);
+}
 export async function ensureSample() {
   if (platform.sample) return platform.sample;
   sampleTries++;
-  toast('Claude 연결 중...', 2000);
+  toast(T('Connecting to Claude...'), 2000);
   platform.sample = await useCapability('sample');
   if (platform.sample) {
     try {
@@ -50,22 +72,14 @@ export async function ensureSample() {
     } catch (e) {
       noteIgnored('boot: sample limits', e);
     }
+    noSampleKind = null;
     $('#noSample').classList.add('hidden');
     if (app.state && !app.state.dead) {
       $('#composer').classList.remove('hidden');
       syncInputHint();
     }
     renderLog('keep');
-  } else {
-    const n = $('#noSample');
-    n.innerHTML =
-      '이 화면에서는 Claude를 호출할 수 없어요. Claude에 로그인한 상태인지 확인하고 다시 시도해 주세요. <button class="btn inline-action" id="retrySample">Claude 연결 다시 시도</button>' +
-      (sampleTries >= 2
-        ? '<br><span class="boot-note">계속 안 되면 ⚙ → 진단 내용을 앱 주인에게 보내 주세요.</span>'
-        : '');
-    n.classList.remove('hidden');
-    $('#retrySample').onclick = ensureSample;
-  }
+  } else showNoSample('failed');
   return platform.sample;
 }
 async function bootInner() {
@@ -102,20 +116,16 @@ async function bootInner() {
     } catch (e) {
       platform.db = memDB('dr-db-' + platform.userId);
       platform.localMode = true;
-      toast('읽기 권한이라 진행 상황은 이 기기에만 저장돼요', 5000);
+      toast(T('Read-only access: your progress is saved on this device only'), 5000);
     }
   }
   if (!platform.sample) {
-    const n = $('#noSample');
-    n.innerHTML =
-      'Claude 연결을 아직 못 받았어요. <button class="btn inline-action" id="retrySample">Claude 연결 다시 시도</button>';
-    n.classList.remove('hidden');
-    $('#retrySample').onclick = ensureSample;
+    showNoSample('waiting');
     setTimeout(() => {
       if (!platform.sample) ensureSample();
     }, 1500);
   }
-  if (platform.memMode) toast('저장소 없이 실행 중: 새로고침하면 사라져요', 4000);
+  if (platform.memMode) toast(T('Running without storage: everything is lost on reload'), 4000);
   if (platform.sample) {
     try {
       platform.limits = await platform.sample.limits();
@@ -124,8 +134,10 @@ async function bootInner() {
     }
   }
   await migrateLegacy();
-  app.settings = Object.assign(app.settings, (await dget('settings')) || {});
+  const stored = await dget('settings');
+  app.settings = Object.assign(app.settings, stored || {});
   settingsLoaded();
+  resolveUiLang(!!stored);
   applyDiscreet();
   await loadPromptConfig();
   await loadWhitelist();
@@ -135,6 +147,12 @@ async function bootInner() {
   const last = (app.settings.lastSave && app.saves.find(s => s.id === app.settings.lastSave)) || app.saves[0];
   if (last) await openSave(last.id);
   else startNewLifeForm();
+}
+
+// players from before the setting existed keep Korean; new players keep the detected language
+function resolveUiLang(returning) {
+  if (!okLang(app.settings.uiLang)) app.settings.uiLang = returning ? 'ko' : uiLang();
+  if (app.settings.uiLang !== uiLang()) applyUiLang(app.settings.uiLang);
 }
 
 export async function loadSaves() {

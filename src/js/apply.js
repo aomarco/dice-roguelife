@@ -1,9 +1,12 @@
 /* ============ applying a reply ============ */
 import { cutLine, MARK_RE, pick } from './util.js';
-import { ART_SLOTS, currencyOf, normEmo, REALMS, SUB_STATS, tierRank, TIERS } from './data.js';
+import { currencyOf, normEmo, REALMS, STAT_LABEL, SUB_STATS, tierRank, TIERS } from './data.js';
+import { ART_SLOT_LABEL, ART_SLOTS, artsToEnums, SKILL_SRC } from './enums.js';
+import { T, tIn } from './i18n.js';
 import { LIMITS } from './limits.js';
 import { addDaysISO, clockMin, fmtKDate, parseKDate } from './calendar.js';
 import { app } from './app.js';
+import { storyLang } from './settings.js';
 import { costPct, growthLevel, sameQuest, TITLES_MAX, titlesOn } from './rules.js';
 import { markSeen, renamePerson } from './people.js';
 import { bgKey, imgById, pickEmotion } from './images.js';
@@ -58,7 +61,7 @@ export function applyOut(reply, turn = {}) {
     notes: [],
     img: {},
     newSkills: [],
-    evolved: false, // an evolution or level-up: announced by its note, and the fanfare cue reads the flag
+    events: new Set(), // 'realm' | 'title' | 'quest' | 'skill': what the turn's sound cue plays for
     isJackpot: turn.fate === 'jackpot',
     preview: turn.preview || null, // the banner and face picked while the reply streamed
     growth: growthLevel(),
@@ -68,7 +71,13 @@ export function applyOut(reply, turn = {}) {
     bannerBase: '', // the place the scene banner shows
   };
   for (const step of APPLY_STEPS) step(ctx);
-  return { deltas: ctx.deltas, newSkills: ctx.newSkills, notes: ctx.notes, img: ctx.img, evolved: ctx.evolved };
+  return {
+    deltas: ctx.deltas,
+    newSkills: ctx.newSkills,
+    notes: ctx.notes,
+    img: ctx.img,
+    events: ctx.events,
+  };
 }
 
 /* ---- stats ---- */
@@ -77,7 +86,7 @@ function applyWindfall(ctx) {
   ctx.windfallStrength = ctx.hasWindfall ? (soon ? 0.5 : 1) : 0; // a second windfall inside the window still counts, at half strength
   if (ctx.hasWindfall) {
     app.state.lastWindfall = app.state.next;
-    ctx.notes.push(soon ? '✦ 기연 (연속이라 절반)' : '✦ 기연');
+    ctx.notes.push(soon ? T('✦ Windfall (halved: too soon after the last)') : T('✦ Windfall'));
   }
   ctx.growthMult = ctx.growth.gm * (1 + ctx.windfallStrength);
 }
@@ -96,9 +105,7 @@ function applyMainStats(ctx) {
     if (!v) continue;
     if (!ctx.isJackpot && v > 0 && cap[k] && v > cap[k]) {
       v = cap[k];
-      notes.push(
-        `${k === 'power' ? '전투력' : k === 'gold' ? '소지금' : k === 'fame' ? '명성' : '최대 HP'} 상승 상한 적용`,
-      );
+      notes.push(T('{stat} gain capped', { stat: T(STAT_LABEL[k] || STAT_LABEL.maxHp) }));
     }
     deltas[k] = v;
     stats[k] = (stats[k] || 0) + v;
@@ -126,7 +133,8 @@ function applySubStats(ctx) {
       app.state.statUp[k] != null &&
       app.state.next - app.state.statUp[k] < cool
     ) {
-      notes.push(`${label} 성장 쿨다운 (${cool - (app.state.next - app.state.statUp[k])}턴 뒤)`);
+      const n = cool - (app.state.next - app.state.statUp[k]);
+      notes.push(T('{stat} growth on cooldown ({n} {n|turn|turns} left)', { stat: T(label), n }));
       continue;
     }
     const before = stats[k] || 5;
@@ -141,12 +149,15 @@ function applyEnergy(ctx) {
   const { deltas, notes } = ctx;
   const e = ctx.reply.energy;
   if (!e || typeof e !== 'object') return;
-  const name = String(e.name || (app.state.energy && app.state.energy.name) || '마나').slice(0, LIMITS.text.energyName);
+  const name = String(e.name || (app.state.energy && app.state.energy.name) || tIn(storyLang(), 'Mana')).slice(
+    0,
+    LIMITS.text.energyName,
+  );
   const mx = Math.round(Number(e.max) || 0);
   const d = Math.round(Number(e.delta) || 0);
   if (!app.state.energy && mx > 0) {
     app.state.energy = { name, cur: mx, max: mx };
-    notes.push(`${name} 각성 (${mx})`);
+    notes.push(T('{name} awakened ({max})', { name, max: mx }));
   } else if (app.state.energy) {
     app.state.energy.name = name;
     if (mx > app.state.energy.max) {
@@ -185,13 +196,16 @@ function applyTitle(ctx) {
     app.state.titlesOn = on;
   }
   app.state.title = titlesOn()[0] || nt;
-  ctx.notes.push(`칭호: ${nt}${app.state.titleFx[nt] ? ' (' + app.state.titleFx[nt] + ')' : ''}`);
+  ctx.notes.push(
+    T('Title: {title}', { title: nt + (app.state.titleFx[nt] ? ' (' + app.state.titleFx[nt] + ')' : '') }),
+  );
+  ctx.events.add('title');
 }
 
 function applyStatusUnlock(ctx) {
   if (ctx.reply.status_unlock === true && !app.state.statusUnlocked) {
     app.state.statusUnlocked = true;
-    ctx.notes.push('상태창 해금');
+    ctx.notes.push(T('Status window unlocked'));
   }
 }
 
@@ -222,7 +236,11 @@ function applyItems(ctx) {
       if (it.slot && !ex.slot && ['weapon', 'armor', 'accessory'].includes(it.slot)) ex.slot = it.slot;
     }
     ex.qty = Math.max(0, ex.qty + d);
-    notes.push(d > 0 ? `획득: ${name}${d > 1 ? ' x' + d : ''}` : `소모: ${name}${-d > 1 ? ' x' + -d : ''}`);
+    notes.push(
+      d > 0
+        ? T('Gained: {item}', { item: name + (d > 1 ? ' x' + d : '') })
+        : T('Used: {item}', { item: name + (-d > 1 ? ' x' + -d : '') }),
+    );
     if (ex.qty <= 0) {
       app.state.items = app.state.items.filter(x => x !== ex);
       app.state.equipped = app.state.equipped.filter(n => n !== name);
@@ -238,7 +256,7 @@ function applyEquipment(ctx) {
     const n = String(n0).trim();
     if (app.state.equipped.includes(n)) {
       app.state.equipped = app.state.equipped.filter(x => x !== n);
-      notes.push(`장비 해제: ${n}`);
+      notes.push(T('Unequipped: {item}', { item: n }));
     }
   }
   for (const n0 of reply.equip) {
@@ -246,7 +264,7 @@ function applyEquipment(ctx) {
     if (!app.state.items.find(x => x.name === n) || app.state.equipped.includes(n)) continue;
     if (app.state.equipped.length >= LIMITS.kept.equipped) break;
     app.state.equipped.push(n);
-    notes.push(`장비: ${n}`);
+    notes.push(T('Equipped: {item}', { item: n }));
   }
 }
 
@@ -261,14 +279,14 @@ function applyLedger(ctx) {
     if (v === null || v === '') {
       if (k in app.state.ledger) {
         delete app.state.ledger[k];
-        notes.push(`장부 정리: ${k}`);
+        notes.push(T('Ledger closed: {entry}', { entry: k }));
       }
       continue;
     }
     const nv = cutLine(v, LIMITS.kept.ledgerLine);
     if (app.state.ledger[k] !== nv) {
       app.state.ledger[k] = nv;
-      notes.push(`장부: ${k} ${nv}`);
+      notes.push(T('Ledger: {entry}', { entry: `${k} ${nv}` }));
     }
   }
   const ks = Object.keys(app.state.ledger);
@@ -280,7 +298,7 @@ function applyChannel(ctx) {
   if (ctx.reply.channel_open === true && app.state.life.sponsor && !app.state.channelOpen) {
     app.state.channelOpen = true;
     app.state.channelAt = app.state.next;
-    ctx.notes.push('성좌 채널 개설');
+    ctx.notes.push(T('Constellation channel opened'));
   }
 }
 
@@ -288,7 +306,7 @@ function applyRace(ctx) {
   const o = ctx.reply;
   if (o.race && typeof o.race === 'string' && o.race.trim() && o.race.trim() !== app.state.life.race) {
     const nr = o.race.trim().slice(0, LIMITS.text.name);
-    ctx.notes.push(`종족 변화: ${app.state.life.race} → ${nr}`);
+    ctx.notes.push(T('Race changed: {from} → {to}', { from: app.state.life.race, to: nr }));
     app.state.life.race = nr;
   }
 }
@@ -304,7 +322,7 @@ function applyLevelUps(ctx) {
     if (!k) continue;
     k.lv = Math.min(LIMITS.skillLevelMax, (k.lv || 1) + 1);
     ctx.notes.push(`${k.name} Lv.${k.lv}`);
-    ctx.evolved = true;
+    ctx.events.add('skill');
   }
 }
 
@@ -324,15 +342,19 @@ function applyEvolutions(ctx) {
       name: to,
       grade: g,
       desc: String(ev.desc || ks[0].desc || '').slice(0, LIMITS.text.desc),
-      src: ks.length > 1 ? '합성' : '진화',
+      src: ks.length > 1 ? SKILL_SRC.MERGED : SKILL_SRC.EVOLVED,
       lv: 1,
       at: app.state.next,
     };
     const ec = costPct(ev.cost) || ks[0].cost;
     if (ec) nk.cost = ec;
     app.state.skills.push(nk);
-    ctx.notes.push(ks.length > 1 ? `스킬 합성: ${froms.join(' + ')} → ${to}` : `스킬 진화: ${froms[0]} → ${to}`);
-    ctx.evolved = true;
+    ctx.notes.push(
+      ks.length > 1
+        ? T('Skills merged: {from} → {to}', { from: froms.join(' + '), to })
+        : T('Skill evolved: {from} → {to}', { from: froms[0], to }),
+    );
+    ctx.events.add('skill');
   }
 }
 
@@ -348,14 +370,14 @@ function applyNewSkills(ctx) {
     let g = TIERS.includes(k.grade) ? k.grade : 'C';
     if (!ctx.isJackpot && tierRank(g) < Math.max(0, best - 1)) {
       g = TIERS[Math.max(0, best - 1)];
-      ctx.notes.push(`스킬 등급 상한 적용 (${g})`);
+      ctx.notes.push(T('Skill grade capped ({grade})', { grade: g }));
     }
     if (!app.state.skills.find(x => x.name === k.name)) {
       const sk = {
         name: String(k.name).slice(0, LIMITS.text.name),
         grade: g,
         desc: String(k.desc || '').slice(0, LIMITS.text.desc),
-        src: '획득',
+        src: SKILL_SRC.GAINED,
         at: app.state.next,
       };
       const c = costPct(k.cost);
@@ -366,7 +388,7 @@ function applyNewSkills(ctx) {
   }
 }
 
-// a cost is set once; the narrator reads it back from [스킬]
+// a cost is set once; the narrator reads it back from the skills block
 function applySkillCosts(ctx) {
   const o = ctx.reply;
   for (const [n, v] of Object.entries(o.skill_costs && typeof o.skill_costs === 'object' ? o.skill_costs : {}).slice(
@@ -377,15 +399,15 @@ function applySkillCosts(ctx) {
     const c = costPct(v);
     if (k && c && !k.cost) {
       k.cost = c;
-      ctx.notes.push(`${k.name} 비용 ${c}%`);
+      ctx.notes.push(T('{skill} cost {cost}%', { skill: k.name, cost: c }));
     }
   }
 }
 
-// an inherited skill (계승) cannot be taken away
+// an inherited skill cannot be taken away
 function applyRemovedSkills(ctx) {
   for (const n of ctx.reply.remove_skills || [])
-    app.state.skills = app.state.skills.filter(x => x.name !== n || x.src === '계승');
+    app.state.skills = app.state.skills.filter(x => x.name !== n || x.src === SKILL_SRC.INHERITED);
 }
 
 /* ---- memory ---- */
@@ -419,7 +441,7 @@ function applyRenames(ctx) {
       b = String(to || '')
         .trim()
         .slice(0, LIMITS.text.name);
-    if (a && b && a !== b && renamePerson(a, b)) ctx.notes.push(`인물 정리: ${a} → ${b}`);
+    if (a && b && a !== b && renamePerson(a, b)) ctx.notes.push(T('Same person: {from} → {to}', { from: a, to: b }));
   }
 }
 
@@ -446,7 +468,7 @@ function applyDeaths(ctx) {
     }
     const tier = k ? setTier(k) : 'extra';
     app.state.deadNpc[n] = { tier, set: k || null, at: app.state.next };
-    ctx.notes.push(`사망: ${n}`);
+    ctx.notes.push(T('Died: {name}', { name: n }));
   }
 }
 
@@ -458,7 +480,10 @@ function applyQuests(ctx) {
       app.state.quests.find(x => x.title === q.title) ||
       app.state.quests.find(x => x.status === 'active' && sameQuest(x.title, q.title));
     if (ex) {
-      if (q.status === 'done' && ex.status !== 'done') ctx.notes.push(`의뢰 완료: ${ex.title}`);
+      if (q.status === 'done' && ex.status !== 'done') {
+        ctx.notes.push(T('Quest done: {title}', { title: ex.title }));
+        ctx.events.add('quest');
+      }
       ex.status = q.status || ex.status;
       if (q.note) ex.note = q.note;
     } else app.state.quests.push({ title: q.title, status: q.status || 'active', note: q.note || '' });
@@ -496,25 +521,27 @@ function applyClock(ctx) {
   if (app.state.clock.anchor)
     app.state.clock.date = fmtKDate(
       addDaysISO(app.state.clock.anchor.date, app.state.clock.day - app.state.clock.anchor.day),
+      storyLang(),
     ); /* a real calendar: the code counts the date */
   else if (c.date) {
     const iso = parseKDate(c.date);
     if (iso) {
       app.state.clock.anchor = { date: iso, day: app.state.clock.day };
-      app.state.clock.date = fmtKDate(iso);
+      app.state.clock.date = fmtKDate(iso, storyLang());
     } else app.state.clock.date = String(c.date).slice(0, LIMITS.text.label);
   }
 }
 
 // one realm step at a time
 function applyMurim(ctx) {
-  const { reply, deltas, notes } = ctx;
+  const { reply, deltas, notes, events } = ctx;
   if (!app.state.murim || !reply.murim || typeof reply.murim !== 'object') return;
   const u = reply.murim,
     M = app.state.murim;
   if (u.realm_up === true && M.realm < REALMS.length - 1) {
     M.realm++;
-    notes.push(`경지 상승: ${REALMS[M.realm]}`);
+    notes.push(T('Realm up: {realm}', { realm: T(REALMS[M.realm]) }));
+    events.add('realm');
   }
   const ng = Math.max(-LIMITS.move.neigong, Math.min(LIMITS.move.neigong, Math.round(Number(u.neigong) || 0)));
   if (ng) {
@@ -526,19 +553,20 @@ function applyMurim(ctx) {
       const v = String(u[k]).slice(0, LIMITS.text.name);
       if (M[k] !== v) {
         M[k] = v;
-        if (k === 'alias') notes.push(`별호: ${v}`);
-        if (k === 'faction') notes.push(`소속: ${v}`);
+        if (k === 'alias') notes.push(T('Epithet: {name}', { name: v }));
+        if (k === 'faction') notes.push(T('Faction: {name}', { name: v }));
       }
     }
-  if (u.arts && typeof u.arts === 'object')
-    for (const k of ART_SLOTS)
-      if (u.arts[k]) {
-        const v = String(u.arts[k]).slice(0, LIMITS.text.label);
-        if (M.arts[k] !== v) {
-          M.arts[k] = v;
-          notes.push(`${k}: ${v}`);
-        }
+  // the Korean prompt names slots by their Korean words
+  const arts = artsToEnums(u.arts && typeof u.arts === 'object' ? u.arts : {});
+  for (const k of ART_SLOTS)
+    if (arts[k]) {
+      const v = String(arts[k]).slice(0, LIMITS.text.label);
+      if (M.arts[k] !== v) {
+        M.arts[k] = v;
+        notes.push(`${T(ART_SLOT_LABEL[k])}: ${v}`);
       }
+    }
 }
 
 /* ---- pictures: the code resolves the narrator's words to real images ---- */
@@ -549,7 +577,9 @@ function applyScene(ctx) {
   if (reply.scene && !img.scene) {
     const f = findPlace(reply.scene, (reply.clock && reply.clock.time) || app.state.clock.time, spot);
     if (f) img.scene = pick(f.list).id;
-    img.why = [`${String(reply.scene).slice(0, 60)} → ${f ? f.base + (f.via === 'memory' ? ' (기억)' : '') : '없음'}`];
+    img.why = [
+      `${String(reply.scene).slice(0, 60)} → ${f ? f.base + (f.via === 'memory' ? T(' (memory)') : '') : T('None')}`,
+    ];
   } // what was asked and what was found, for when a picture looks wrong
   const x = imgById(img.scene);
   ctx.bannerBase = x ? baseOfKey(bgKey(x)) : '';
@@ -651,6 +681,6 @@ function applyDeath(ctx) {
       deltas.hp = (deltas.hp || 0) - stats.hp;
       stats.hp = 0;
     }
-    if (reply.dead !== true) notes.push('HP 0: 사망');
+    if (reply.dead !== true) notes.push(T('HP 0: dead'));
   }
 }

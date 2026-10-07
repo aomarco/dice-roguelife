@@ -5,6 +5,7 @@ import { app } from './app.js';
 import { useCapability } from './boot.js';
 import { imgUrl, worldsOf } from './images.js';
 import { logErr } from './diag.js';
+import { T } from './i18n.js';
 
 const EXT = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif' };
 const TIMES = ['day', 'sunset', 'night', 'indoor'];
@@ -135,7 +136,7 @@ export async function makeZip(files) {
 async function save(filename, blob) {
   const dl = await useCapability('downloads');
   if (!dl) {
-    toast('이 화면에선 파일 저장을 쓸 수 없어요. 게시된 링크에서 열어 주세요');
+    toast(T("This page can't save files. Open it from the published link"));
     return false;
   }
   await dl.save({ filename, data: blob });
@@ -149,7 +150,7 @@ export async function exportPack(withImages) {
   };
   const imgs = app.images.filter(x => x.kind === 'char' || x.kind === 'scene' || x.kind === 'fx');
   if (!imgs.length) {
-    toast('내보낼 이미지가 없어요');
+    toast(T('No images to export'));
     return;
   }
   const day = new Date().toISOString().slice(0, 10);
@@ -158,13 +159,13 @@ export async function exportPack(withImages) {
       const names = nameAll(imgs, () => 'png');
       const json = JSON.stringify(buildTagsJson(imgs, names), null, 2);
       if (await save(`tags_${day}.json`, new Blob([json], { type: 'application/json' })))
-        toast('tags.json을 내보냈어요 (파일 이름은 이미지를 올릴 때 이름이 그대로예요)', 4000);
+        toast(T('Exported tags.json (file names match the names images were uploaded with)'), 4000);
       return;
     }
     const blobs = [];
     let skipped = 0;
     for (let i = 0; i < imgs.length; i++) {
-      say(`이미지 받는 중 ${i + 1}/${imgs.length}`);
+      say(T('Downloading images {i}/{n}', { i: i + 1, n: imgs.length }));
       try {
         const r = await fetch(imgUrl(imgs[i].id));
         if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -179,21 +180,24 @@ export async function exportPack(withImages) {
     const haveBlobs = blobs.filter(Boolean);
     const names = nameAll(have, x => EXT[haveBlobs[have.indexOf(x)].type] || 'png');
     const json = JSON.stringify(buildTagsJson(have, names), null, 2);
-    say('zip 만드는 중');
+    say(T('Building the zip'));
     const zip = await makeZip([
       ...have.map((_, i) => ({ name: names[i], blob: haveBlobs[i] })),
       { name: 'tags.json', blob: new Blob([json], { type: 'application/json' }) },
     ]);
     if (await save(`dice-roguelife-images_${day}.zip`, zip))
       toast(
-        `이미지 ${have.length}장과 tags.json을 zip으로 내보냈어요 (${(zip.size / 1048576).toFixed(1)}MB)${skipped ? `, 받지 못한 ${skipped}장 제외` : ''}`,
+        T('Exported {n} {n|image|images} and tags.json as a zip ({mb}MB)', {
+          n: have.length,
+          mb: (zip.size / 1048576).toFixed(1),
+        }) + (skipped ? T(', skipped {n} that could not be downloaded', { n: skipped }) : ''),
         5000,
       );
   } catch (e) {
-    if (e && e.code === 'declined') toast('취소했어요');
+    if (e && e.code === 'declined') toast(T('Cancelled'));
     else {
       logErr('export-pack', e);
-      toast('내보내기 실패: ' + ((e && (e.code || e.message)) || e), 5000);
+      toast(T('Export failed: {err}', { err: (e && (e.code || e.message)) || e }), 5000);
     }
   } finally {
     say('');

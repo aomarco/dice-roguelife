@@ -54,9 +54,9 @@ test('talents owner', async ({ game }) => {
     errs,
     'each filled talent becomes its own skill with its own grade',
     same(skills, [
-      ['검에 대한 집착', 'B', '재능'],
-      ['독 내성', 'A', '재능'],
-      ['잔재주', 'C', '재능'],
+      ['검에 대한 집착', 'B', 'talent'],
+      ['독 내성', 'A', 'talent'],
+      ['잔재주', 'C', 'talent'],
     ]),
   );
   const line = (await pg.evaluate('window.__prompts.slice(-1)[0]')).split('\n').find(l => l.startsWith('[스킬]')) || '';

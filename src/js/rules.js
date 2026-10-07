@@ -2,6 +2,7 @@
 import { WORLDS } from './data.js';
 import { app } from './app.js';
 import { setting } from './settings.js';
+import { N_ } from './i18n.js';
 
 const RULE_KEYS = ['growth', 'knowledgeGuard', 'dice', 'gambler', 'gamblerP'];
 export function snapshotRules() {
@@ -16,12 +17,12 @@ export function rule(k) {
   }
   return app.settings[k];
 }
-const GROWTH_LEVELS = {
-  stingy: { name: '짠맛', gm: 0.5, subMax: 1, cool: 8, key: 'stingy' },
-  tight: { name: '빡빡함', gm: 0.75, subMax: 2, cool: 4, key: 'stingy' },
-  normal: { name: '보통', gm: 1, subMax: 3, cool: 0, key: '' },
-  ample: { name: '넉넉함', gm: 1.25, subMax: 3, cool: 0, key: 'generous' },
-  generous: { name: '후함', gm: 1.5, subMax: 4, cool: 0, key: 'generous' },
+export const GROWTH_LEVELS = {
+  stingy: { name: N_('Stingy'), gm: 0.5, subMax: 1, cool: 8, key: 'stingy' },
+  tight: { name: N_('Tight'), gm: 0.75, subMax: 2, cool: 4, key: 'stingy' },
+  normal: { name: N_('Normal'), gm: 1, subMax: 3, cool: 0, key: '' },
+  ample: { name: N_('Ample'), gm: 1.25, subMax: 3, cool: 0, key: 'generous' },
+  generous: { name: N_('Generous'), gm: 1.5, subMax: 4, cool: 0, key: 'generous' },
 };
 export function lifeDiff(l) {
   l = l || (app.state && app.state.life);
@@ -52,10 +53,8 @@ export let statusVisible = function statusVisible() {
   return !SYSTEM_WORLDS.includes(app.state.life.world.id);
 };
 /* ---- dice ---- */
-// An offered choice ends in its chance, "(성공 확률 30%)", maybe with a word that makes it decisive ("결정적").
-// A d100 at or below the chance succeeds. Succeeding at a low chance, or failing at a high one, is critical.
-export const ODDS_RE = /\s*\(\s*성공\s*확률\s*(\d{1,3})\s*%([^)]*)\)\s*$/;
-export const PIVOTAL_RE = /결정적|운명|목숨/; // the dice reveal plays whatever the result
+// A choice ends in its chance (reply-words.js matchOdds). A d100 at or below the chance succeeds; succeeding at a low
+// chance, or failing at a high one, is critical.
 const CRIT_SUCCESS_MAX = 20; // a success at this chance or lower is critical
 const CRIT_FAIL_MIN = 80; // a failure at this chance or higher is critical
 export function rollGrade(r) {
@@ -80,7 +79,7 @@ export function titlesOn() {
   let on = Array.isArray(app.state.titlesOn)
     ? app.state.titlesOn.filter(t => (app.state.titles || []).includes(t))
     : null;
-  if (!on || !on.length) on = app.state.title && app.state.title !== '없음' ? [app.state.title] : [];
+  if (!on || !on.length) on = app.state.title ? [app.state.title] : [];
   return on.slice(0, TITLES_MAX);
 }
 export function sameQuest(a, b) {

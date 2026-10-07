@@ -30,7 +30,9 @@ test('worlds', async ({ game }) => {
     'every world rolls, entry and constellation rates within 15 points of its settings: ' + JSON.stringify(off),
     off.length === 0,
   );
-  const TR = await pg.evaluate('DR.TRANSFER_RACES');
+  const TR = await pg.evaluate(
+    "(()=>{const t=DR.TRANSFER_RACES,k=l=>l.map(x=>DR.tIn('ko',x));return {other:k(t.other),modern:k(t.modern)}})()",
+  );
   const ERR = '[데이터 없음(ERROR)]'; // one roll in a hundred is the glitch race
   const hr = await pg.evaluate(
     "(()=>{for(let i=0;i<500;i++){const l=DR.rollLife('x','남','hunter',null,null);if(l.entry==='transfer')return l.race}})()",
@@ -100,7 +102,7 @@ test('worlds', async ({ game }) => {
   // the next two random draws come out 0.01
   await pg.evaluate('DR.rnd=(()=>{let i=0;return()=>{i++;return i<=2?0.01:Math.random()}})();0');
   await pg.evaluate(
-    "(()=>{const o=DR.rollLife;DR.rollLife=(...a)=>{const l=o(...a);l.world=DR.WORLDS.find(w=>w.id==='hunter');l.entry='possess';l.sponsor={stance:'적대'};return l}})()",
+    "(()=>{const o=DR.rollLife;DR.rollLife=(...a)=>{const l=o(...a);l.world=DR.worldIn(DR.WORLDS.find(w=>w.id==='hunter'),'ko');l.entry='possess';l.sponsor={stance:'hostile'};return l}})()",
   );
   await pg.fill('#nm', '진무');
   await pg.click('#rollBtn');

@@ -2,6 +2,9 @@
 import * as hostClaude from './host-claude.js';
 import * as host from './host.js';
 import * as util from './util.js';
+import * as i18n from './i18n.js';
+import * as enums from './enums.js';
+import * as replyWords from './reply-words.js';
 import * as data from './data.js';
 import * as limits from './limits.js';
 import * as calendar from './calendar.js';
@@ -48,6 +51,9 @@ import * as imagesView from './images-view.js';
 const MODULES = [
   hostClaude,
   host,
+  i18n,
+  enums,
+  replyWords,
   util,
   data,
   limits,

@@ -1,10 +1,13 @@
 /* ============ turn engine ============ */
 import { clone, noteIgnored, pick, rnd, shortWhat, toast, uid } from './util.js';
-import { askOf, cmdIs, ENTRY_NAME, normEmo } from './data.js';
+import { isPivotal, matchOdds, mentionsStars, stripOdds } from './reply-words.js';
+import { askOf, cmdIs, normEmo } from './data.js';
+import { ENTRY_LABEL, STANCE_LABEL } from './enums.js';
+import { T } from './i18n.js';
 import { platform } from './db.js';
 import { NEW_SAVES, turnStore } from './turn-store.js';
 import { app, currentRun, exclusive } from './app.js';
-import { critOf, ODDS_RE, PIVOTAL_RE, rollGrade, rule } from './rules.js';
+import { critOf, rollGrade, rule } from './rules.js';
 import { aliasOut } from './people.js';
 import { cueDeath, cueDoom, cueFanfare, cueItem, cueQuest, cueRealm, cueReveal, cueSkill } from './sound.js';
 import { ensureSample } from './boot.js';
@@ -16,7 +19,7 @@ import { openStatus, renderStrip } from './status.js';
 import { adminFace, countInputHint, renderLog, showLiveReply } from './log.js';
 import { fitInput, input, offerInput, parseCmd, saveDraft, setSendMode } from './composer.js';
 import { applyOut } from './apply.js';
-import { callNarrator, peekReply } from './prompt.js';
+import { callNarrator, peekReply, pl, plLabel } from './prompt.js';
 import { applyErratum, upholdObjection } from './reroll.js';
 import { maybeSummarize } from './summaries.js';
 
@@ -30,26 +33,24 @@ function makeRoll(text) {
   const memo = app.state.rollMemo && app.state.rollMemo.at === app.state.next ? app.state.rollMemo.roll : null;
   const d = memo && memo.d != null ? memo.d : 1 + Math.floor(rnd() * 100);
   const norm = x => String(x).replace(/\s+/g, '');
-  const pick = offeredChoices().find(
-    c => norm(c) === norm(text) || norm(String(c).replace(ODDS_RE, '')) === norm(text),
-  );
+  const pick = offeredChoices().find(c => norm(c) === norm(text) || norm(stripOdds(c)) === norm(text));
   if (pick) {
-    const m = ODDS_RE.exec(pick);
+    const m = matchOdds(pick);
     if (m) {
-      const p = Math.max(1, Math.min(99, +m[1]));
+      const p = Math.max(1, Math.min(99, m.p));
       const r = {
         d,
         p,
         ok: d <= p,
-        pivotal: PIVOTAL_RE.test(m[2] || ''),
+        pivotal: isPivotal(m.rest),
         fixed: true,
-        what: shortWhat(String(pick).replace(ODDS_RE, '')),
+        what: shortWhat(stripOdds(pick)),
       };
       r.crit = critOf(r);
-      return { text: String(text).replace(ODDS_RE, '').trim() || text, roll: r };
+      return { text: stripOdds(text).trim() || text, roll: r };
     }
   }
-  return { text: ODDS_RE.test(text) ? text.replace(ODDS_RE, '').trim() : text, roll: { d, p: null } }; // a chance the player wrote is not binding
+  return { text: matchOdds(text) ? stripOdds(text).trim() : text, roll: { d, p: null } }; // a chance the player wrote is not binding
 }
 export let showDice = function showDice(r) {
   return new Promise(res => {
@@ -70,7 +71,7 @@ export let showDice = function showDice(r) {
     ];
     const el = document.createElement('div');
     el.className = 'dice-ov ' + (r.ok ? 'ok' : 'bad');
-    el.innerHTML = `<div class="box"><div class="die">${pic ? `<img alt="" src="${imgUrl(pic.id)}">` : face ? `<img alt="" src="${imgUrl(face.id)}" class="round-face">` : `<div class="d20">${r.d}</div>`}</div>${pic || face ? `<div class="num">${r.d}</div>` : ''}<div class="lbl">${label}</div><div class="sub">${r.p} 이하 필요: 🎲 ${r.d} (낮을수록 좋아요)</div></div>`;
+    el.innerHTML = `<div class="box"><div class="die">${pic ? `<img alt="" src="${imgUrl(pic.id)}">` : face ? `<img alt="" src="${imgUrl(face.id)}" class="round-face">` : `<div class="d20">${r.d}</div>`}</div>${pic || face ? `<div class="num">${r.d}</div>` : ''}<div class="lbl">${label}</div><div class="sub">${T('Needs {p} or less: 🎲 {d} (lower is better)', { p: r.p, d: r.d })}</div></div>`;
     document.body.appendChild(el);
     try {
       r.ok ? cueFanfare() : cueDeath();
@@ -97,13 +98,18 @@ async function sendInner(text) {
     openStatus();
     return;
   }
-  if (cmd && cmd.type === 'gallery' && /성좌/.test(cmd.arg || '')) {
+  if (cmd && cmd.type === 'gallery' && (cmd.id === 'star' || mentionsStars(cmd.arg || ''))) {
     if (!app.state.life.sponsor) {
-      toast('이 세계에는 성좌가 없어요');
+      toast(T('This world has no constellations'));
       return;
     }
     if (!app.state.channelOpen) {
-      toast('성좌들은 아직 당신을 보지 않아요. 각성이나 큰 사건으로 채널이 열리면 볼 수 있어요', 4500);
+      toast(
+        T(
+          "The constellations aren't watching you yet. You can see them once an awakening or a big event opens the channel",
+        ),
+        4500,
+      );
       return;
     }
   }
@@ -111,9 +117,9 @@ async function sendInner(text) {
     const st = await staleSave(app.currentSave.id);
     if (st) {
       offerInput(raw);
-      if (st === 'gone') closeGone(app.currentSave.id, '이 저장은 다른 곳에서 삭제돼서 닫았어요');
+      if (st === 'gone') closeGone(app.currentSave.id, T('This save was deleted somewhere else, so it was closed'));
       else {
-        toast('다른 곳에서 이 저장이 바뀌어 최신으로 불러왔어요. 다시 보내 주세요', 4500);
+        toast(T('This save changed somewhere else, so the latest was loaded. Please send again'), 4500);
         await openSave(app.currentSave.id);
       }
       return;
@@ -184,15 +190,18 @@ async function undoLastSend(u, quiet) {
     fitInput();
     saveDraft();
     input.focus();
-    if (!quiet) toast('보내기를 취소했어요. 입력창에 되돌려 놨어요');
-  } else if (!quiet) toast('중지했어요');
+    if (!quiet) toast(T('Send cancelled. Your text is back in the input box'));
+  } else if (!quiet) toast(T('Stopped'));
   renderStrip();
   renderLog('keep');
 }
 export function lifeExtra(l) {
   const x = [];
-  if (l.entry && l.entry !== 'native') x.push(`, 출신 ${ENTRY_NAME[l.entry]}`);
-  if (l.sponsor) x.push(`, 성좌 있음(ADMIN과 ${l.sponsor.stance})`);
+  if (l.entry && l.entry !== 'native') x.push(pl(', arrival: {entry}', { entry: plLabel(ENTRY_LABEL, l.entry) }));
+  if (l.sponsor)
+    x.push(
+      pl(', has constellations (stance toward ADMIN: {stance})', { stance: plLabel(STANCE_LABEL, l.sponsor.stance) }),
+    );
   return x.join('');
 }
 const LUCK_P = { bad: 0.03, good: 0.03 };
@@ -230,7 +239,7 @@ export async function runTurn(text, cmd, opts = {}) {
   const run = opts.run || currentRun(); // the action this reply belongs to; leaving the save abandons it
   if (!run || run.abandoned) return;
   if (!platform.sample && !(await ensureSample())) {
-    toast('Claude를 호출할 수 없어요');
+    toast(T("Can't call Claude"));
     return;
   }
   if (run.abandoned) return;
@@ -243,7 +252,7 @@ export async function runTurn(text, cmd, opts = {}) {
     redo: (fix && fix.reason) || '', // what the rewrite must fix, told to the narrator
     objection: (fix && fix.objection) || null, // the upheld /판정 a rewrite answers, kept on the reply
     sent, // the line to take back if the player stops the reply
-    head: askOf(cmd) ? askOf(cmd).head : null, // the live box heading
+    head: askOf(cmd) ? askOf(cmd).head : null, // the live box heading (English; log.js shows it with T)
     preview: null, // the banner and face picked while the reply streamed (once per reply)
     previewNpc: '', // whose face that is
     abort: new AbortController(), // the stop button
@@ -464,44 +473,44 @@ async function settleDice(turn, out) {
   }
   if (roll.fixed && roll.crit) await showDice(roll);
 }
-// the reply's notes plus what the turn itself brought: fate and a critical roll first, then luck and new faces
+// the reply's notes plus what the turn itself brought: fate first, then luck and new faces
 function turnNotes(notes, turn) {
-  const { fate, luck, roll } = turn;
-  if (fate) notes.unshift(fate === 'jackpot' ? '★ 잭팟' : '☠ 나락');
-  if (luck) notes.push(luck === 'bad' ? '☁ 생활 운: 작은 불운' : '🍀 생활 운: 작은 행운');
-  for (const n of takePromoted()) notes.push(`${n}: 얼굴이 정해졌어요`);
-  if (roll && roll.crit)
-    notes.unshift(roll.ok ? `★ ${roll.p} 이하 필요: 🎲${roll.d} → 성공` : `☠ ${roll.p} 이하 필요: 🎲${roll.d} → 실패`);
+  const { fate, luck } = turn;
+  if (fate) notes.unshift(fate === 'jackpot' ? T('★ Jackpot') : T('☠ Doom'));
+  if (luck) notes.push(luck === 'bad' ? T('☁ Daily luck: a little bad luck') : T('🍀 Daily luck: a little good luck'));
+  for (const n of takePromoted()) notes.push(T('{name}: face settled', { name: n }));
   return notes;
 }
 // one sound for the turn, the loudest event winning: death, a critical failure, then a realm or a title, a skill,
 // a finished quest, money. A jackpot or doom fate and a realm rise sound on top.
 function playTurnCue(res, turn) {
-  const N = res.notes;
+  const ev = res.events;
   const dead = app.state.dead;
-  if (!dead && N.some(n => n.startsWith('경지 상승'))) cueRealm();
+  if (!dead && ev.has('realm')) cueRealm();
   if (turn.fate === 'jackpot' && !dead) cueReveal('SSS');
   else if (turn.fate === 'doom' && !dead) cueDoom();
   if (dead) cueDeath();
-  else if (N.some(n => n.startsWith('☠')))
+  else if (turn.roll && turn.roll.crit && !turn.roll.ok)
     cueDoom(); // a critical failure: no fanfare for a title it happened to bring
-  else if (N.some(n => n.startsWith('경지 상승') || n.startsWith('칭호:'))) cueFanfare();
-  else if ((res.newSkills && res.newSkills.length) || res.evolved) cueSkill();
-  else if (N.some(n => n.startsWith('의뢰 완료'))) cueQuest();
+  else if (ev.has('realm') || ev.has('title')) cueFanfare();
+  else if ((res.newSkills && res.newSkills.length) || ev.has('skill')) cueSkill();
+  else if (ev.has('quest')) cueQuest();
   else if ((res.deltas.gold || 0) >= 100) cueItem();
 }
 export function sampleError(e) {
   const c = e && e.code;
   toast(
     c === 'rate_limited'
-      ? '요청이 많아요. 잠시 후 다시 시도하세요'
+      ? T('Too many requests. Try again in a moment')
       : c === 'not_granted'
-        ? 'Claude 사용 권한이 필요해요'
+        ? T('Permission to use Claude is needed')
         : c === 'prompt_too_large'
-          ? '기억이 너무 길어요. 기억 탭에서 설정을 줄여 주세요'
+          ? T('The memory is too long. Trim the lore in the Memory tab')
           : c === 'refused'
-            ? '이 입력이 안전 필터에 걸렸어요. 현실 방법 묘사를 빼거나 세계관 설정으로 바꿔 다시 보내 주세요'
-            : '오류: ' + ((e && e.message) || c || '알 수 없음'),
+            ? T(
+                'This input was caught by the safety filter. Leave out real-world how-to details, or recast it as part of the setting, and send again',
+              )
+            : T('Error: {msg}', { msg: (e && e.message) || c || T('unknown') }),
     4000,
   );
 }

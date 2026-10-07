@@ -48,7 +48,7 @@ test('smoke2', async ({ game }) => {
     M.realm === Math.min(M0.realm + 1, s0.top) &&
       M.neigong === M0.neigong + Math.min(5, s0.lim.neigong) &&
       M.alias === '비객' &&
-      M.arts['검법'] === '매화검법',
+      M.arts.sword === '매화검법', // the Korean slot name in a reply is stored as its enum
   );
   const day = s0.day + Math.min(400, s0.lim.days);
   check(

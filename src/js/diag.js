@@ -1,5 +1,6 @@
 /* ============ diagnostics: the recent errors kept for ⚙ ============ */
 import { nowIso } from './util.js';
+import { locale } from './i18n.js';
 import { dset } from './db.js';
 import { app, APP_VERSION } from './app.js';
 
@@ -26,7 +27,7 @@ export function catchPageErrors() {
 // the last few errors, readable later when something goes wrong
 export function logErr(stage, e) {
   ERRLOG.unshift({
-    t: new Date().toLocaleTimeString('ko-KR'),
+    t: new Date().toLocaleTimeString(locale()),
     at: nowIso(),
     stage,
     code: (e && e.code) || '',

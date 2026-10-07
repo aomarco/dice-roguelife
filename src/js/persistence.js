@@ -1,5 +1,6 @@
 /* ============ saves / turns persistence ============ */
-import { $, clone, noteIgnored, nowIso, toast } from './util.js';
+import { $, clone, fmt, noteIgnored, nowIso, toast } from './util.js';
+import { T } from './i18n.js';
 import { cmdIs } from './data.js';
 import { dget, dset, platform, userDoc } from './db.js';
 import { DB_DOC_CAP, GONE_SAVES, NEW_SAVES, turnStore } from './turn-store.js';
@@ -109,11 +110,11 @@ async function persistNow() {
   if (!NEW_SAVES.has(id)) {
     const st = await staleSave(id);
     if (st === 'gone') {
-      closeGone(id, '이 저장은 다른 곳에서 삭제돼서 닫았어요');
+      closeGone(id, T('This save was deleted somewhere else, so it was closed'));
       return;
     }
     if (st === 'changed') {
-      toast('다른 곳에서 이 저장이 바뀌어 최신으로 다시 불러와요', 4000);
+      toast(T('This save changed somewhere else; reloading the latest'), 4000);
       await openSave(id);
       return;
     }
@@ -133,7 +134,7 @@ async function persistNow() {
     NEW_SAVES.delete(id);
     if (app.currentSave && app.currentSave.id === id) Object.assign(app.currentSave, card);
   } catch (e) {
-    toast('저장 실패: ' + (e.code || e.message));
+    toast(T('Save failed: {err}', { err: e.code || e.message }));
   }
   if (!app.currentSave || app.currentSave.id !== id) return; // closed or switched while writing
   const i = app.saves.findIndex(s => s.id === id);
@@ -149,12 +150,12 @@ export async function openSave(id, { keepAction = false } = {}) {
   try {
     st = await dget(`states/items/${id}`);
   } catch (e) {
-    toast('저장을 불러오지 못했어요. 잠시 후 다시 열어 주세요 (' + (e.code || e.message) + ')', 4500); // a failed read is not a missing save
+    toast(T("Couldn't load the save. Open it again in a moment ({err})", { err: e.code || e.message }), 4500); // a failed read is not a missing save
     if (!app.state) startNewLifeForm();
     return;
   }
   if (!st) {
-    toast('저장 데이터를 찾을 수 없어요');
+    toast(T("Can't find the save data"));
     if (app.settings.lastSave === id) {
       delete app.settings.lastSave;
       saveSettings().catch(e => noteIgnored('persistence: dset settings', e));
@@ -172,7 +173,7 @@ export async function openSave(id, { keepAction = false } = {}) {
     app.currentSave.pages = m2.pages || app.currentSave.pages;
   } catch (e) {
     console.warn('migrate', e);
-    toast('저장 형식 정리를 다음에 다시 시도할게요', 3000);
+    toast(T('Will retry updating the save format next time'), 3000);
   }
   try {
     app.turns = await turnStore.loadAll2Latest(id);
@@ -188,7 +189,7 @@ export async function openSave(id, { keepAction = false } = {}) {
       if (snapT) {
         app.state = compat(clone(snapT.snap));
         app.state.next = lastRow.i + 1;
-        toast('마지막 저장 지점으로 복구했어요', 3000);
+        toast(T('Restored to the last saved point'), 3000);
         persist().catch(e => noteIgnored('persistence: persist', e));
       }
     }
@@ -234,7 +235,7 @@ export async function loadEarlier() {
   try {
     const older = await turnStore.loadBefore(app.currentSave.id, first.i, 80);
     if (!older.length) {
-      toast('더 이전 기록이 없어요');
+      toast(T('No earlier history'));
       return;
     }
     const log = $('#log');
@@ -243,7 +244,7 @@ export async function loadEarlier() {
     renderLog();
     log.scrollTop = log.scrollHeight - h;
   } catch (e) {
-    toast('불러오기 실패');
+    toast(T('Loading failed'));
   }
 }
 export function showPlay() {
@@ -269,11 +270,11 @@ export async function storeError(e) {
         noteIgnored('store error: does the save still exist', e);
       }
       if (!ex) {
-        closeGone(id, '이 저장은 다른 곳에서 삭제돼서 닫았어요');
+        closeGone(id, T('This save was deleted somewhere else, so it was closed'));
         return;
       }
     }
-    toast('다른 기기에서 이 저장이 진행돼서 다시 불러와요', 4000);
+    toast(T('This save moved on from another device; reloading it'), 4000);
     if (id) await openSave(id);
     return;
   }
@@ -281,11 +282,11 @@ export async function storeError(e) {
     showQuotaFull();
     return;
   }
-  toast('저장 실패: ' + ((e && (e.code || e.message)) || '알 수 없음'));
+  toast(T('Save failed: {err}', { err: (e && (e.code || e.message)) || T('unknown') }));
 }
 function showQuotaFull() {
   openSheet(
-    `<h3>저장 공간이 가득 찼어요</h3><p class="quota-lead">이 앱의 저장소는 문서 ${DB_DOC_CAP.toLocaleString()}개가 한도예요. 방금 내용은 저장되지 않았어요.</p><p class="muted quota-note">저장 탭에서 오래된 저장이나 분기를 <b>이야기 내보내기</b>로 파일로 남긴 뒤 삭제하면 공간이 생겨요. 그다음 다시 보내거나 다시 시도하면 이어서 진행돼요.</p><div class="row"><button class="btn primary" id="quotaSaves">저장 탭으로</button><button class="btn ghost" data-close>닫기</button></div>`,
+    `<h3>${T('Storage is full')}</h3><p class="quota-lead">${T("This app's storage holds at most {n} documents. What just happened was not saved.", { n: fmt(DB_DOC_CAP) })}</p><p class="muted quota-note">${T('In the Saves tab, keep old saves or branches as files with <b>Export story</b>, then delete them to make room. Then send again or try again to carry on.')}</p><div class="row"><button class="btn primary" id="quotaSaves">${T('Go to Saves')}</button><button class="btn ghost" data-close>${T('Close')}</button></div>`,
   );
   $('#quotaSaves').onclick = () => {
     closeSheet();

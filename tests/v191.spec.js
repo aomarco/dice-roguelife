@@ -112,7 +112,7 @@ test('v191', async ({ game }) => {
   check(
     errs,
     'the desktop placeholder ends with the Shift+Enter hint (Enter sends by default)',
-    ph === (await pg.evaluate('DR.INPUT_PH')) + ' (Shift+Enter 줄바꿈)',
+    ph === (await pg.evaluate('DR.inputPh()')) + ' (Shift+Enter 줄바꿈)',
   );
   expect(errs).toEqual([]);
 });

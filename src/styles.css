@@ -2204,6 +2204,21 @@ html.discreet .sk {
   margin: 0;
   line-height: 1.15;
 }
+.nl-head {
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.nl-lang {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+.nl-lang select {
+  width: auto;
+  padding: 4px 8px;
+}
 .field {
   display: flex;
   flex-direction: column;
@@ -3662,6 +3677,9 @@ textarea.mem-edit {
 }
 .lang-row {
   margin-top: 10px;
+}
+.ui-lang-field {
+  margin: 0 0 10px;
 }
 .lang-tip {
   flex: 1;

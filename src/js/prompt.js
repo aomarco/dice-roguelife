@@ -1,14 +1,17 @@
 /* ============ prompt ============ */
 import PR_DEFAULT from '../../prompts.json' with { type: 'json' };
 import { stripMarks } from './util.js';
-import { ART_SLOTS, askOf, cmdIs, currencyOf, powerGrade, REALMS } from './data.js';
+import { askOf, cmdIs, moneyText, powerGrade, REALMS } from './data.js';
+import { ART_SLOT_LABEL, ART_SLOTS, GENDER_LABEL, SKILL_SRC, STANCE_LABEL } from './enums.js';
 import { LIMITS } from './limits.js';
 import { withWeekday } from './calendar.js';
 import { platform, thaw } from './db.js';
 import { app } from './app.js';
-import { setting } from './settings.js';
+import { promptLang, setting, storyLang } from './settings.js';
+import { N_, T, tIn } from './i18n.js';
 import { logErr } from './diag.js';
-import { growthLevel, itemBonus, lifeDiff, ODDS_RE, rollGrade, rule, statusVisible, titlesOn } from './rules.js';
+import { growthLevel, itemBonus, lifeDiff, rollGrade, rule, statusVisible, titlesOn } from './rules.js';
+import { stripOdds } from './reply-words.js';
 import { activeRel, canonName } from './people.js';
 import { charSets, fitsWorld } from './images.js';
 import { placeVocab } from './places.js';
@@ -16,11 +19,18 @@ import { setIds } from './casting.js';
 import { widgetOf } from './widgets.js';
 
 export let prompts = PR_DEFAULT; // narrator prompt text; config/prompt in the db overrides field by field
+// a prompts.json map keyed by story language ("lang", "tip", "ledgerLang", "summaryLang")
+export const prLang = k => ((prompts && prompts[k]) || {})[storyLang()] || '';
+// a prompts.json entry; an English story reads prompts.en's version when there is one
+export const pr = k => {
+  const en = promptLang() === 'en' && prompts.en;
+  return en && en[k] !== undefined ? en[k] : prompts[k];
+};
+export const pl = (en, vars) => tIn(promptLang(), en, vars);
+// an enum's label in the prompt's language (an unknown value as it is)
+export const plLabel = (labels, v) => (labels[v] ? pl(labels[v]).toLowerCase() : v);
 export const fillTemplate = (str, v) =>
   String(str || '').replace(/\{(\w+)\}/g, (m, k) => (v[k] !== undefined ? v[k] : m));
-function rulesText() {
-  return (prompts && prompts.rules) || '';
-}
 export async function loadPromptConfig() {
   try {
     const d = await platform.shared.doc('config/prompt').get();
@@ -32,7 +42,8 @@ export async function loadPromptConfig() {
 }
 
 export const recentBudget = () => Math.max(10000, Math.min(200000, Number(app.settings.recentBytes) || 40000)); // bytes of raw recent turns before the summaries take over
-export const tbytes = x => new TextEncoder().encode(x).length;
+const ENCODER = new TextEncoder();
+export const tbytes = x => ENCODER.encode(x).length;
 // counted in exchanges (one narrator reply with the player's line before it), the same unit as the top bar
 function recentEstimate() {
   const pool = app.turns.slice(-80);
@@ -41,10 +52,14 @@ function recentEstimate() {
   const bytes = pool.reduce((a, t) => a + tbytes(turnText(t, true)), 0);
   return Math.max(3, Math.round(recentBudget() / Math.max(400, bytes / ai)));
 }
-export const recentLine = () =>
-  app.state
-    ? `지금 ${recentWindow().filter(t => t.kind === 'ai').length}턴이 들어가요. 이 게임의 평균 턴 크기면 약 ${recentEstimate()}턴까지 담겨요. `
-    : '';
+export function recentLine() {
+  if (!app.state) return '';
+  const est = recentEstimate();
+  return (
+    T('Right now {n} {n|turn is|turns are} included. ', { n: recentWindow().filter(t => t.kind === 'ai').length }) +
+    (est ? T("At this game's average turn size, up to about {m} turns fit. ", { m: est }) : '')
+  );
+}
 export function recentWindow() {
   // the newest turns, taken from the end until the budget is spent (older player turns count trimmed); at least six
   const pool = app.turns.filter(t => t.i > app.state.summarizedUpto);
@@ -62,20 +77,35 @@ export function recentWindow() {
 export function turnText(t, trim, noAdmin) {
   if (t.kind === 'user') {
     const x = String(t.text || '');
-    return `플레이어: ${trim && x.length > 300 ? x.slice(0, 300) + '…' : x}`;
+    return pl('Player: {text}', { text: trim && x.length > 300 ? x.slice(0, 300) + '…' : x });
   }
-  if (t.kind === 'system') return `[시스템] ${t.text}`;
-  if (t.kind === 'ledger') return `[인생 결산] ${(t.out && t.out.summary) || ''}`;
+  if (t.kind === 'system') return pl('[System] {text}', { text: t.text });
+  if (t.kind === 'ledger') return pl('[Life ledger] {text}', { text: (t.out && t.out.summary) || '' });
   const o = t.out || {};
   let s = '';
   if (o.admin && !noAdmin) s += `ADMIN: ${o.admin}\n`;
   s += stripMarks(o.narration).slice(0, 1400);
-  if (o.widget) s += `\n(위젯: ${o.widget.type}${o.widget.headline ? ' ' + o.widget.headline : ''})`;
-  if (o.choices && o.choices.length) s += `\n선택지: ${o.choices.join(' / ')}`;
+  if (o.widget)
+    s += pl('\n(widget: {type}{headline})', {
+      type: o.widget.type,
+      headline: o.widget.headline ? ' ' + o.widget.headline : '',
+    });
+  if (o.choices && o.choices.length) s += pl('\nChoices: {list}', { list: o.choices.join(' / ') });
   return s;
 }
-export const ADMIN_PERSONAS = () =>
-  Object.assign({}, (prompts && prompts.personas) || {}, { custom: { name: '직접 입력', text: '' } });
+// names in the screen's language, texts in the prompt's
+export const ADMIN_PERSONAS = () => {
+  const ko = (prompts && prompts.personas) || {};
+  const en = (prompts && prompts.en && prompts.en.personas) || {};
+  const out = {};
+  for (const k of Object.keys(ko))
+    out[k] = {
+      name: en[k] && en[k].name ? T(en[k].name) : ko[k].name,
+      text: (promptLang() === 'en' && en[k] && en[k].text) || ko[k].text,
+    };
+  out.custom = { name: T('Write your own'), text: '' };
+  return out;
+};
 function adminBlock() {
   const AP = ADMIN_PERSONAS();
   const k = setting('adminPersona');
@@ -86,6 +116,7 @@ function adminBlock() {
 // The list's heading was '규칙:' and is now 'Rules:'; with neither, the settings follow the whole rules text.
 function withPlayerSettings(rules, extra) {
   if (!extra) return rules;
+  // i18n-ignore: an older live prompt's heading
   for (const head of ['\nRules:\n', '\n규칙:\n']) {
     const i = rules.indexOf(head);
     if (i >= 0) return rules.slice(0, i) + '\n' + extra + rules.slice(i);
@@ -148,28 +179,84 @@ function recentForPrompt() {
 function meBlock() {
   const l = app.state.life,
     s = app.state.stats;
-  return `[플레이어] ${l.name}, ${l.gender}, ${s.age}세, 종족 ${l.race}, 신분 ${l.origin}(${l.originTier}), 칭호 ${(() => {
-    const on = titlesOn(),
-      fx = app.state.titleFx || {};
-    const act = on.length ? on.map(t => `${t}${fx[t] ? `(${fx[t]})` : ''}`).join(', ') : '없음';
-    const held = (app.state.titles || []).filter(t => !on.includes(t));
-    return act + (held.length ? ` (보유: ${held.join(', ')})` : '');
-  })()}, ${app.state.lifeNo}번째 삶`;
+  const on = titlesOn(),
+    fx = app.state.titleFx || {};
+  const act = on.length ? on.map(t => `${t}${fx[t] ? `(${fx[t]})` : ''}`).join(', ') : pl('None');
+  const held = (app.state.titles || []).filter(t => !on.includes(t));
+  return pl(
+    '[Player] {name}, {gender}, age {age}, race {race}, standing {origin} ({tier}), titles {titles}, life #{n}',
+    {
+      name: l.name,
+      gender: plLabel(GENDER_LABEL, l.gender),
+      age: s.age,
+      race: l.race,
+      origin: l.origin,
+      tier: l.originTier,
+      titles: act + (held.length ? pl(' (also held: {list})', { list: held.join(', ') }) : ''),
+      n: app.state.lifeNo,
+    },
+  );
 }
 function statBlock() {
   const l = app.state.life,
-    s = app.state.stats;
-  return `[스탯]${statusVisible() ? '' : ' (플레이어에겐 아직 숫자가 보이지 않는다: 각성이나 측정이 오면 status_unlock)'} HP ${s.hp}/${s.maxHp}, 전투력 ${s.power}${itemBonus() ? `+${itemBonus()}(장비)=${s.power + itemBonus()}` : ''}(${powerGrade(s.power + itemBonus())}), 체력 ${s.con} 근력 ${s.str} 마력 ${s.mag} 민첩 ${s.agi} 지능 ${s.int} 매력 ${s.cha} (1~10이 일반인, 그 위는 초인)${app.state.energy ? `, ${app.state.energy.name} ${app.state.energy.cur}/${app.state.energy.max}${(r => (r <= 0 ? ' (탈진: 힘을 쓸 수 없고 몸이 말을 안 듣는다)' : r < 0.1 ? ' (탈진 직전)' : r < 0.3 ? ' (바닥이 보인다)' : ''))(app.state.energy.cur / Math.max(1, app.state.energy.max))}` : ', 힘의 자원 없음(아직 힘의 체계를 얻지 못함)'}, 소지금 ${s.gold.toLocaleString('ko-KR')}${currencyOf(l.world.id)[0]}, 명성 ${s.fame}`;
+    s = app.state.stats,
+    E = app.state.energy;
+  const bonus = itemBonus();
+  const energy = E
+    ? `, ${E.name} ${E.cur}/${E.max}${(r =>
+        r <= 0
+          ? pl(' (exhausted: no power can be used and the body will not obey)')
+          : r < 0.1
+            ? pl(' (nearly exhausted)')
+            : r < 0.3
+              ? pl(' (running low)')
+              : '')(E.cur / Math.max(1, E.max))}`
+    : pl(', no power resource (no power system yet)');
+  return (
+    pl('[Stats]') +
+    (statusVisible()
+      ? ''
+      : pl(' (the player cannot see numbers yet: when an awakening or a measurement comes, status_unlock)')) +
+    pl(
+      ' HP {hp}/{maxHp}, power {power}{bonus}({grade}), Constitution {con} Strength {str} Magic {mag} Agility {agi} Intelligence {int} Charm {cha} (1-10 is the human range, above it superhuman)',
+      {
+        hp: s.hp,
+        maxHp: s.maxHp,
+        power: s.power,
+        bonus: bonus ? pl('+{bonus}(gear)={total}', { bonus, total: s.power + bonus }) : '',
+        grade: powerGrade(s.power + bonus),
+        con: s.con,
+        str: s.str,
+        mag: s.mag,
+        agi: s.agi,
+        int: s.int,
+        cha: s.cha,
+      },
+    ) +
+    energy +
+    pl(', money {money}, fame {fame}', { money: moneyText(s.gold, l.world.id, promptLang()), fame: s.fame })
+  );
 }
 function murimBlock() {
   const M = app.state.murim;
-  return M
-    ? `${fillTemplate(prompts.murim, { realms: REALMS.join(' > ') })}\n[무림 상태] 경지 ${REALMS[M.realm]}${M.realm < REALMS.length - 1 ? `(다음 ${REALMS[M.realm + 1]})` : ''}, 내공 ${M.neigong}년, 세력 ${M.faction || '없음'}${M.rank ? '/' + M.rank : ''}, 별호 ${M.alias || '없음'}${M.constitution ? ', 체질 ' + M.constitution : ''}, 무공 ${
-        ART_SLOTS.filter(k => M.arts[k])
-          .map(k => k + ':' + M.arts[k])
-          .join(' / ') || '없음'
-      }`
-    : '';
+  if (!M) return '';
+  const realm = i => pl(REALMS[i]);
+  const arts = ART_SLOTS.filter(k => M.arts[k])
+    .map(k => pl(ART_SLOT_LABEL[k]) + ':' + M.arts[k])
+    .join(' / ');
+  return `${fillTemplate(pr('murim'), { realms: REALMS.map(r => pl(r)).join(' > ') })}\n${pl(
+    '[Murim status] realm {realm}{next}, inner energy {neigong} years, faction {faction}{rank}, epithet {alias}{constitution}, arts {arts}',
+    {
+      realm: realm(M.realm),
+      next: M.realm < REALMS.length - 1 ? pl(' (next {realm})', { realm: realm(M.realm + 1) }) : '',
+      neigong: M.neigong,
+      faction: M.faction || pl('None'),
+      rank: M.rank ? '/' + M.rank : '',
+      alias: M.alias || pl('None'),
+      constitution: M.constitution ? pl(', constitution {c}', { c: M.constitution }) : '',
+      arts: arts || pl('None'),
+    },
+  )}`;
 }
 function relationsBlock() {
   return Object.keys(app.state.relations).length
@@ -179,7 +266,11 @@ function relationsBlock() {
           (al[canonName(b)] = al[canonName(b)] || []).push(a);
         const active = activeRel();
         return active.length
-          ? `[관계] ${active.map(([n, v]) => `${n}${al[n] ? `(= ${al[n].slice(0, 4).join(', ')})` : ''}: ${v}`).join(' | ')}`
+          ? pl('[Relations] {list}', {
+              list: active
+                .map(([n, v]) => `${n}${al[n] ? `(= ${al[n].slice(0, 4).join(', ')})` : ''}: ${v}`)
+                .join(' | '),
+            })
           : '';
       })()
     : '';
@@ -200,7 +291,7 @@ function namedBlock(hay) {
   const groups = new Map();
   for (const [k, m] of list) {
     const ids = setIds(k);
-    const gname = ids.length ? ids[0].val : '기타';
+    const gname = ids.length ? ids[0].val : pl('Other');
     if (!groups.has(gname)) groups.set(gname, { name: gname, vals: [], members: [] });
     const g = groups.get(gname);
     for (const i of ids) if (!g.vals.includes(i.val)) g.vals.push(i.val);
@@ -213,7 +304,7 @@ function namedBlock(hay) {
     const short = (segs.find(t => t.length >= 3) || segs[0] || '').slice(0, 12).trim(); // the first phrase that still says something once the identity is removed
     g.members.push({
       name: m.charName,
-      g: m.gender === 'female' ? '여' : m.gender === 'male' ? '남' : '?',
+      g: m.gender === 'female' ? pl('F') : m.gender === 'male' ? pl('M') : '?',
       short,
       hit: ctx.includes(m.charName) ? 1 : 0,
     });
@@ -247,34 +338,40 @@ function namedBlock(hay) {
     }
     if (size >= 480) break;
   }
-  return parts.length ? fillTemplate(prompts.named, { list: parts.join(' | ') }) : '';
+  return parts.length ? fillTemplate(pr('named'), { list: parts.join(' | ') }) : '';
 }
 function widgetsBlock(cmd) {
-  const W = prompts.widgets || {};
+  const W = pr('widgets') || {};
   if (cmdIs(cmd, 'ask')) return '';
-  if (cmd && W[cmd.type]) return fillTemplate(prompts.widgetsCmd, { schema: W[cmd.type] });
-  return prompts.widgetsIdle;
+  if (cmd && W[cmd.type]) return fillTemplate(pr('widgetsCmd'), { schema: W[cmd.type] });
+  return pr('widgetsIdle');
 }
 function cmdBlock(cmd) {
   if (!cmd) return '';
   const ask = askOf(cmd);
-  if (ask) return fillTemplate(prompts[ask.prompt], { q: cmd.arg || ask.q });
-  const how = cmdIs(cmd, 'browse') ? prompts.cmdBrowse : prompts.cmdAct;
-  return `[명령] ${cmd.type} 위젯을 반드시 채울 것. ${cmd.arg ? '내용: ' + cmd.arg : ''}\n${how}`;
+  if (ask) return fillTemplate(pr(ask.prompt), { q: cmd.arg || pl(ask.q) });
+  const how = cmdIs(cmd, 'browse') ? pr('cmdBrowse') : pr('cmdAct');
+  return `${pl('[Command] Always fill the {type} widget. {arg}', {
+    type: cmd.type,
+    arg: cmd.arg ? pl('Content: {arg}', { arg: cmd.arg }) : '',
+  })}\n${how}`;
 }
+const GRADE_WORDS = {
+  critSuccess: N_('critical success'),
+  success: N_('success'),
+  fail: N_('failure'),
+  critFail: N_('critical failure'),
+};
 function rollBlock(roll) {
   return !roll
     ? ''
     : roll.fixed
-      ? fillTemplate(prompts.roll, {
-          result: { critSuccess: '대성공', success: '성공', fail: '실패', critFail: '대실패' }[rollGrade(roll)],
-          d: roll.d,
-          p: roll.p,
-        })
+      ? fillTemplate(pr('roll'), { result: pl(GRADE_WORDS[rollGrade(roll)]), d: roll.d, p: roll.p })
       : roll.d != null
-        ? fillTemplate(prompts.rollFree, { d: roll.d })
+        ? fillTemplate(pr('rollFree'), { d: roll.d })
         : '';
 }
+const ifAny = (items, f) => (items.length ? f(items.join(' | ')) : '');
 
 // turn: what runTurn rolled for this reply (roll, luck, fate) and what a rewrite must fix (redo)
 export function buildPrompt(text, cmd, turn = {}) {
@@ -287,98 +384,125 @@ export function buildPrompt(text, cmd, turn = {}) {
     .filter(([k]) => hay.includes(k))
     .slice(0, 15);
   const vocab = placeVocab();
+  const d = lifeDiff(l);
   const P = {
     adminp: adminBlock(),
-    world: `[세계] ${l.world.name}${l.world.desc ? ` (${l.world.desc})` : ''}: ${l.world.risk}. ${l.world.opp}. 이번 삶의 난이도 ${lifeDiff(l)}/5: 적, 경쟁자, 세계의 기준 수치와 요구치가 ${lifeDiff(l) >= 5 ? '가혹한 편이다' : lifeDiff(l) <= 1 ? '관대한 편이다' : '그만큼 높다'}.`, // the adjective describes the world's demands, not the narrator's attitude
+    // the adjective describes the world's demands, not the narrator's attitude
+    world: pl(
+      "[World] {name}{desc}: {risk}. {opp}. This life's difficulty {d}/5: enemies, rivals and the world's standards and demands are {adj}.",
+      {
+        name: l.world.name,
+        desc: l.world.desc ? ` (${l.world.desc})` : '',
+        risk: l.world.risk,
+        opp: l.world.opp,
+        d,
+        adj: d >= 5 ? pl('on the harsh side') : d <= 1 ? pl('on the lenient side') : pl('correspondingly high'),
+      },
+    ),
     me: meBlock(),
-    cheat: prompts.cheat, // always on: asserting things you do not have is a lie inside the fiction
+    cheat: pr('cheat'), // always on: asserting things you do not have is a lie inside the fiction
     growth: (() => {
       const k = growthLevel().key;
-      return k ? (prompts.growth || {})[k] || '' : '';
+      return k ? (pr('growth') || {})[k] || '' : '';
     })(),
-    know: rule('knowledgeGuard') !== false ? prompts.knowledge : '', // the player always brings knowledge from outside this world (their own, a past life, the character's origin); the rule is about the process, not the source
-    profile: l.profile ? `[플레이어 설정: 이 캐릭터의 서사와 성격에 반드시 반영] ${l.profile}` : '',
+    know: rule('knowledgeGuard') !== false ? pr('knowledge') : '', // the player always brings knowledge from outside this world (their own, a past life, the character's origin); the rule is about the process, not the source
+    profile: l.profile
+      ? pl("[Player profile: always reflect it in this character's story and personality] {profile}", {
+          profile: l.profile,
+        })
+      : '',
     entry:
       l.entry === 'possess'
-        ? prompts.entryPossess
+        ? pr('entryPossess')
         : l.entry === 'transfer'
-          ? fillTemplate(prompts.entryTransfer, { from: l.world.from || '현대 한국' })
+          ? fillTemplate(pr('entryTransfer'), { from: l.world.from || pl('modern-day Earth') })
           : '',
     sponsor: l.sponsor
-      ? fillTemplate(app.state.channelOpen ? prompts.sponsorOpen : prompts.sponsorClosed, { stance: l.sponsor.stance })
+      ? fillTemplate(app.state.channelOpen ? pr('sponsorOpen') : pr('sponsorClosed'), {
+          stance: plLabel(STANCE_LABEL, l.sponsor.stance),
+        })
       : '',
     stat: statBlock(),
     murim: murimBlock(),
-    clock: `[시각] D+${ck.day}${ck.date ? ', ' + withWeekday(ck.date) : ''}${ck.time ? ', ' + ck.time : ''}${ck.weather ? ', ' + ck.weather : ''}${ck.place ? ', ' + ck.place : ''}`,
-    skill: `[스킬] ${app.state.skills.map(k => `${k.name}(${k.grade}, Lv.${k.lv || 1}${k.cost ? `, 비용 ${k.cost}%` : ''}${k.src === '계승' ? ', 전생 계승' : ''}): ${k.desc}`).join(' | ')}`,
-    note: app.state.stateNote ? `[현재 상황] ${app.state.stateNote}` : '',
-    quest: app.state.quests.filter(q => q.status === 'active').length
-      ? `[진행 중 의뢰] ${app.state.quests
-          .filter(q => q.status === 'active')
-          .map(q => q.title + (q.note ? ` (${q.note})` : ''))
-          .join(' | ')}`
-      : '',
-    ledger: Object.keys(app.state.ledger || {}).length
-      ? `[장부] ${Object.entries(app.state.ledger)
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(' | ')}`
-      : '',
-    gear: (app.state.equipped || []).length
-      ? `[장비] ${app.state.equipped
-          .map(n => {
-            const it = (app.state.items || []).find(x => x.name === n) || {};
-            return `${n}(${it.grade || '-'}${it.power ? ', +' + it.power : ''}${it.note ? ': ' + it.note.slice(0, 40) : ''})`;
-          })
-          .join(' | ')}`
-      : '',
-    inv: (app.state.items || []).length
-      ? `[소지품] ${app.state.items.map(it => `${it.name}${it.qty > 1 ? ' x' + it.qty : ''}${it.grade ? '(' + it.grade + ')' : ''}${it.note && !(app.state.equipped || []).includes(it.name) ? ': ' + it.note.slice(0, 30) : ''}`).join(' | ')}`
-      : '',
+    clock: `${pl('[Time]')} D+${ck.day}${ck.date ? ', ' + withWeekday(ck.date) : ''}${ck.time ? ', ' + ck.time : ''}${ck.weather ? ', ' + ck.weather : ''}${ck.place ? ', ' + ck.place : ''}`,
+    skill: `${pl('[Skills]')} ${app.state.skills.map(k => `${k.name}(${k.grade}, Lv.${k.lv || 1}${k.cost ? pl(', cost {n}%', { n: k.cost }) : ''}${k.src === SKILL_SRC.INHERITED ? pl(', inherited from a past life') : ''}): ${k.desc}`).join(' | ')}`,
+    note: app.state.stateNote ? pl('[Current situation] {note}', { note: app.state.stateNote }) : '',
+    quest: ifAny(
+      app.state.quests.filter(q => q.status === 'active').map(q => q.title + (q.note ? ` (${q.note})` : '')),
+      list => pl('[Active quests] {list}', { list }),
+    ),
+    ledger: ifAny(
+      Object.entries(app.state.ledger || {}).map(([k, v]) => `${k}: ${v}`),
+      list => pl('[Ledger] {list}', { list }),
+    ),
+    gear: ifAny(
+      (app.state.equipped || []).map(n => {
+        const it = (app.state.items || []).find(x => x.name === n) || {};
+        return `${n}(${it.grade || '-'}${it.power ? ', +' + it.power : ''}${it.note ? ': ' + it.note.slice(0, 40) : ''})`;
+      }),
+      list => pl('[Gear] {list}', { list }),
+    ),
+    inv: ifAny(
+      (app.state.items || []).map(
+        it =>
+          `${it.name}${it.qty > 1 ? ' x' + it.qty : ''}${it.grade ? '(' + it.grade + ')' : ''}${it.note && !(app.state.equipped || []).includes(it.name) ? ': ' + it.note.slice(0, 30) : ''}`,
+      ),
+      list => pl('[Inventory] {list}', { list }),
+    ),
     rel: relationsBlock(),
-    lore: lore.length ? `[관련 설정] ${lore.map(([k, v]) => `${k}: ${v}`).join(' | ')}` : '',
-    past: app.state.pastLives.length
-      ? `[전생 기록] ${app.state.pastLives
-          .slice(-5)
-          .map(p => `${p.lifeNo}회차 ${p.world}/${p.origin}(${p.tier}), ${p.epitaph}`)
-          .join(' | ')}`
-      : '',
+    lore: ifAny(
+      lore.map(([k, v]) => `${k}: ${v}`),
+      list => pl('[Related lore] {list}', { list }),
+    ),
+    past: ifAny(
+      app.state.pastLives.slice(-5).map(p =>
+        pl('life {n}: {world}/{origin} ({tier}), {epitaph}', {
+          n: p.lifeNo,
+          world: p.world,
+          origin: p.origin,
+          tier: p.tier,
+          epitaph: p.epitaph,
+        }),
+      ),
+      list => pl('[Past lives] {list}', { list }),
+    ),
     sum: app.state.summaries.length
-      ? `[지난 이야기 요약]\n${app.state.summaries.map(x => '- ' + x.text).join('\n')}`
+      ? `${pl('[Story so far]')}\n${app.state.summaries.map(x => '- ' + x.text).join('\n')}`
       : '',
-    user: app.state.userNotes ? `[유저 노트: 반드시 따를 것]\n${app.state.userNotes}` : '',
+    user: app.state.userNotes ? `${pl('[Player notes: always follow]')}\n${app.state.userNotes}` : '',
     named: namedBlock(hay),
-    bg: `[장소 단어] ${vocab.length ? vocab.join(', ') : '없음. scene은 null'}`,
-    recent: recentStr ? `[최근 진행]\n${recentStr}` : '',
+    bg: pl('[Place words] {list}', { list: vocab.length ? vocab.join(', ') : pl('none. scene is null') }),
+    recent: recentStr ? `${pl('[Recent]')}\n${recentStr}` : '',
     widgets: widgetsBlock(cmd),
     cmd: cmdBlock(cmd),
-    redo: redo ? fillTemplate(prompts.redo, { reason: redo }) : '',
+    redo: redo ? fillTemplate(pr('redo'), { reason: redo }) : '',
     errata:
       app.state.errataNote && !cmdIs(cmd, 'browse')
         ? fillTemplate(
-            prompts.errata ||
-              '[정정] 지난 기록의 오류를 바로잡았다: {fact}. 이번 답 첫머리에 한두 문장으로 자연스럽게 수습한다.',
+            pr('errata') ||
+              pl(
+                '[Correction] An error in the earlier record was fixed: {fact}. Smooth it over naturally in a sentence or two at the start of this reply.',
+              ),
             { fact: app.state.errataNote },
           )
         : '',
     corr: (app.state.corrections || []).filter(c => c.until >= app.state.next).length
-      ? `${prompts.corrHead}\n${app.state.corrections
+      ? `${pr('corrHead')}\n${app.state.corrections
           .filter(c => c.until >= app.state.next)
           .map(c => '- ' + c.text)
           .join('\n')}`
       : '',
-    fate: fate ? prompts.fateHead + (fate === 'jackpot' ? prompts.fateJackpot : prompts.fateDoom) : '',
-    luck: luck === 'bad' ? prompts.luckBad || '' : luck === 'good' ? prompts.luckGood || '' : '',
-    nodice: rule('dice') === false ? prompts.noDice || '' : '',
-    jcore: roll || (cmd && cmd.type === 'judge') ? prompts.judgeCore || '' : '',
+    fate: fate ? pr('fateHead') + (fate === 'jackpot' ? pr('fateJackpot') : pr('fateDoom')) : '',
+    luck: luck === 'bad' ? pr('luckBad') || '' : luck === 'good' ? pr('luckGood') || '' : '',
+    nodice: rule('dice') === false ? pr('noDice') || '' : '',
+    jcore: roll || (cmd && cmd.type === 'judge') ? pr('judgeCore') || '' : '',
     roll: rollBlock(roll),
-    input: `[이번 입력] ${text}\n\n${prompts.jsonTail}`,
+    input: `${pl('[This input] {text}', { text })}\n\n${pr('jsonTail')}`,
   };
-  const LEN = { short: prompts.lenShort, normal: '', long: prompts.lenLong }[setting('len')] || '';
-  const lang = setting('lang');
-  const LR = prompts.lang || {},
-    TR = prompts.tip || {};
-  const extra = (LR[lang] || '') + (app.settings.langTip && TR[lang] ? '\n[추가 출력 필드] ' + TR[lang] : '');
-  const rules = withPlayerSettings(rulesText(), [LEN, extra].filter(Boolean).join('\n'));
+  const LEN = { short: pr('lenShort'), normal: '', long: pr('lenLong') }[setting('len')] || '';
+  const tip = app.settings.langTip ? prLang('tip') : '';
+  const extra = prLang('lang') + (tip ? pl('\n[Extra output field] ') + tip : '');
+  const rules = withPlayerSettings(pr('rules') || '', [LEN, extra].filter(Boolean).join('\n'));
   const build = skip =>
     rules +
     '\n\n' +
@@ -483,7 +607,7 @@ export async function callNarrator(text, cmd, turn) {
     // fallback 1: plain text mode, then pull the JSON out ourselves
     if (signal && signal.aborted) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
     try {
-      const r = await platform.sample(prompt + '\n\n' + prompts.fallbackText, {
+      const r = await platform.sample(prompt + '\n\n' + pr('fallbackText'), {
         modelTier: setting('tier'),
         cache: cacheOpt(),
         onText,
@@ -500,7 +624,7 @@ export async function callNarrator(text, cmd, turn) {
     // fallback 2: compact retry on the quick tier
     if (signal && signal.aborted) throw Object.assign(new Error('cancelled'), { code: 'cancelled' });
     try {
-      const r = await platform.sample(prompt + '\n\n' + prompts.fallbackCompact, {
+      const r = await platform.sample(prompt + '\n\n' + pr('fallbackCompact'), {
         modelTier: 'quick',
         cache: false,
         signal,
@@ -512,7 +636,7 @@ export async function callNarrator(text, cmd, turn) {
       logErr('compact', e3);
       if (e3 && FATAL.includes(e3.code)) throw e3;
     }
-    throw Object.assign(new Error('응답을 읽지 못했어요 (⚙ → 최근 오류 참고)'), { code: 'no_json' });
+    throw Object.assign(new Error(T("Couldn't read the reply (see ⚙ → Recent errors)")), { code: 'no_json' });
   }
 }
 function extractJson(t) {
@@ -587,7 +711,7 @@ export function normalize(o) {
   o.speaker_hidden = o.speaker_hidden === true;
   o.ledger = o.ledger && typeof o.ledger === 'object' && !Array.isArray(o.ledger) ? o.ledger : null;
   if (app.state && rule('dice') === false && Array.isArray(o.choices))
-    o.choices = o.choices.map(c => String(c).replace(ODDS_RE, '').trim());
+    o.choices = o.choices.map(c => stripOdds(c).trim());
   o.items = Array.isArray(o.items)
     ? o.items.filter(x => x && typeof x === 'object' && x.name).slice(0, LIMITS.perReply.items)
     : [];

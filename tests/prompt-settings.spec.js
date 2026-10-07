@@ -4,7 +4,7 @@ import { test, expect } from './support/test.js';
 import { claudeMock, startLife } from './support/harness.js';
 
 const CHECK = String.raw`(()=>{const p=DR.buildPrompt('간다',null);const at=s=>s?p.indexOf(s):-2;const rules=p.indexOf('\nRules:\n');
-  return {lang:at(DR.prompts.lang.en),len:at(DR.prompts.lenLong),tip:at(DR.prompts.tip.en),rules,bytes:new Blob([p]).size}})()`;
+  return {lang:at(DR.prompts.lang.en),len:at(DR.pr('lenLong')),tip:at(DR.prompts.tip.en),rules,bytes:new Blob([p]).size}})()`;
 
 test('prompt settings', async ({ game }) => {
   const { pg, errs } = await game(claudeMock(), { size: [420, 900] });

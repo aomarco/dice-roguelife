@@ -1,4 +1,5 @@
 /* ============ honest dice ============ */
+import { locale } from './i18n.js';
 
 export let rnd = function rnd() {
   const a = new Uint32Array(1);
@@ -28,15 +29,15 @@ export let toast = function toast(msg, ms = 2600) {
   setTimeout(() => t.remove(), ms);
 };
 export function fmt(n) {
-  return Number(n || 0).toLocaleString('ko-KR');
+  return Number(n || 0).toLocaleString(locale());
 }
 
 // Errors a caller deliberately survives (a cleanup that may fail, a capability that may be missing). They are kept
-// here instead of thrown so ⚙ → 진단 can show what went wrong on a phone, where there is no console.
+// here instead of thrown so ⚙ → Diagnostics can show what went wrong on a phone, where there is no console.
 export const IGNORED = [];
 export function noteIgnored(where, e) {
   IGNORED.unshift({
-    t: new Date().toLocaleTimeString('ko-KR'),
+    t: new Date().toLocaleTimeString(locale()),
     where,
     msg: String((e && (e.code || e.message)) || e).slice(0, 160),
   });

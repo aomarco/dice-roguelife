@@ -11,7 +11,9 @@ import { renderStrip } from './status.js';
 import { renderLog } from './log.js';
 import { parseCmd } from './composer.js';
 import { lifeExtra, runTurn } from './turn.js';
-import { fillTemplate, prompts } from './prompt.js';
+import { fillTemplate, pl, pr } from './prompt.js';
+import { N_, T, tIn } from './i18n.js';
+import { storyLang } from './settings.js';
 
 // A rewrite takes the last reply back and asks again with the same line, dice and fate. It may carry a fix:
 //   reason     what was wrong, told to the narrator for this reply
@@ -19,27 +21,33 @@ import { fillTemplate, prompts } from './prompt.js';
 //   noCheck    the line should never have been a check: drop its die
 //   objection  the upheld /판정 this rewrite answers, kept on the new reply
 const REROLL_REASONS = [
-  ['impersonate', '내 캐릭터의 대사, 감정, 행동을 대신 정했음'],
-  ['hostile', '내 말을 악의적으로 해석했음'],
-  ['stall', '상황이 진행되지 않고 제자리'],
-  ['repeat', '앞 턴과 반복됨'],
-  ['lore', '설정이나 기억과 어긋남'],
-  ['custom', '직접 입력'],
+  ['impersonate', N_("Decided my character's lines, feelings or actions")],
+  ['hostile', N_('Read my words in bad faith')],
+  ['stall', N_('The story stalled')],
+  ['repeat', N_('Repeated the last turn')],
+  ['lore', N_('Contradicted the lore or memory')],
+  ['custom', N_('Write my own')],
 ];
+// prompt text, given to the narrator with pl()
 const REASON_TEXT = {
-  impersonate:
-    '유저 캐릭터의 감정 표현과 행동을 내레이터가 대신 정했다. 유저 캐릭터의 말과 행동은 유저 입력에 있는 것만 사용한다.',
-  hostile: '유저의 언행을 악의적으로 해석했다. 유저 입력을 문자 그대로, 선의로 해석한다.',
-  stall: '상황이 진행되지 않았다. 이번에는 사건을 확실히 한 단계 진행시키고 새로운 선택지를 준다.',
-  repeat: '직전 턴과 내용이 반복됐다. 새로운 전개, 새로운 대사로 쓴다.',
-  lore: '설정이나 기억과 어긋났다. [관련 설정], [관계], [지난 이야기 요약]을 다시 확인하고 맞춘다.',
+  impersonate: N_(
+    "The narrator decided the player character's feelings and actions. Use only the lines and actions in the player's input for the player character.",
+  ),
+  hostile: N_(
+    "The narrator read the player's words in bad faith. Read the player's input literally and in good faith.",
+  ),
+  stall: N_('The story did not move. This time, clearly move events one step forward and offer new choices.'),
+  repeat: N_('The reply repeated the last turn. Write new developments and new lines.'),
+  lore: N_(
+    'The reply contradicted the lore or memory. Check the related lore, relationships and story summary again and match them.',
+  ),
 };
 export async function rerollWithReason() {
   if (!isIdle()) return;
   const last = app.turns[app.turns.length - 1];
   if (!last || last.kind !== 'ai') return;
   const answer = openDialog(
-    `<h3>다시 쓰기</h3><p class="muted sheet-intro">문제를 고르면 직전 응답을 롤백하고, 그 점을 고쳐서 다시 씁니다.</p><div class="choices">${REROLL_REASONS.map(([k, l]) => `<button data-rr="${k}">${l}</button>`).join('')}<button data-rr="" class="fu">사유 없이 그냥 다시</button></div>`,
+    `<h3>${T('Rewrite')}</h3><p class="muted sheet-intro">${T('Pick the problem: the last reply is rolled back and written again with that fixed.')}</p><div class="choices">${REROLL_REASONS.map(([k, l]) => `<button data-rr="${k}">${T(l)}</button>`).join('')}<button data-rr="" class="fu">${T('Just rewrite, no reason')}</button></div>`,
   );
   $('#sheetInner')
     .querySelectorAll('[data-rr]')
@@ -48,10 +56,10 @@ export async function rerollWithReason() {
   if (pick === null) return;
   let reason = '';
   if (pick === 'custom') {
-    const t = await askPrompt('무엇이 문제였나요?');
+    const t = await askPrompt(T('What was wrong?'));
     if (t === null) return;
     reason = t.trim();
-  } else if (pick) reason = REASON_TEXT[pick] || '';
+  } else if (pick) reason = REASON_TEXT[pick] ? pl(REASON_TEXT[pick]) : '';
   await reroll({ reason, remember: true });
 }
 export function applyErratum(fact, ago, remember, fix, q, out) {
@@ -65,20 +73,25 @@ export function applyErratum(fact, ago, remember, fix, q, out) {
   }
   if (remember) {
     app.state.corrections = (app.state.corrections || []).filter(c => c.until >= app.state.next);
-    app.state.corrections.push({ text: '설정이나 기억과 어긋났다: ' + fact, until: app.state.next + 10 });
+    app.state.corrections.push({
+      text: pl('Contradicted the lore or memory: {fact}', { fact }),
+      until: app.state.next + 10,
+    });
     app.state.corrections = app.state.corrections.slice(-3);
   }
   app.state.errataNote = fact;
   out.narration =
-    String(out.narration || '') + `\n\n[ 정정 반영: ${notes.length ? notes.join(', ') : fact.slice(0, 60)} ]`;
-  toast('정정해서 지금 상태에 반영했어요', 3500);
+    String(out.narration || '') +
+    '\n\n' +
+    tIn(storyLang(), '[ Correction applied: {what} ]', { what: notes.length ? notes.join(', ') : fact.slice(0, 60) });
+  toast(T('Corrected and applied to the current state'), 3500);
 }
 export function seenSpan(name) {
   const m = ((app.state && app.state.meta) || {})[name];
   if (!m || m.l == null) return '';
   const ago = (app.state.next || 0) - m.l;
-  const last = ago <= 0 ? '지금' : ago + '턴 전';
-  const span = m.f === m.l ? `${m.f}턴` : `${m.f}~${m.l}턴`;
+  const last = ago <= 0 ? T('now') : T('{n} {n|turn|turns} ago', { n: ago });
+  const span = m.f === m.l ? T('turn {n}', { n: m.f }) : T('turns {a}-{b}', { a: m.f, b: m.l });
   return `<span class="muted seen-span">${span}${ago > 0 ? ', ' + last : ''}</span>`;
 }
 function applyFix(fix) {
@@ -89,7 +102,7 @@ function applyFix(fix) {
   const g = Math.round(Number(fix.gold) || 0);
   if (g && Math.abs(g) <= cap) {
     app.state.stats.gold = Math.max(0, (app.state.stats.gold || 0) + g);
-    notes.push(`소지금 ${g > 0 ? '+' : ''}${fmt(g)}`);
+    notes.push(T('Money {delta}', { delta: (g > 0 ? '+' : '') + fmt(g) }));
   }
   for (const it of (Array.isArray(fix.items) ? fix.items : []).slice(0, 6)) {
     const name = String((it && it.name) || '')
@@ -125,18 +138,18 @@ function applyFix(fix) {
       if (v === null || v === '') {
         if (k in app.state.ledger) {
           delete app.state.ledger[k];
-          notes.push(`장부 정리: ${k}`);
+          notes.push(T('Ledger closed: {entry}', { entry: k }));
         }
       } else {
         app.state.ledger[k] = cutLine(v, 60);
-        notes.push(`장부: ${k}`);
+        notes.push(T('Ledger: {entry}', { entry: k }));
       }
     }
   }
   for (const r of (Array.isArray(fix.relations) ? fix.relations : []).slice(0, 3)) {
     if (r && r.name) {
       app.state.relations[String(r.name).slice(0, 30)] = String(r.note || '').slice(0, 200);
-      notes.push(`관계: ${String(r.name).slice(0, 20)}`);
+      notes.push(T('Relationship: {name}', { name: String(r.name).slice(0, 20) }));
     }
   }
   return notes;
@@ -158,11 +171,11 @@ export async function upholdObjection(fact, judge, { remember, noCheck }) {
     await persist();
     if (!app.state || run.abandoned) return;
   }
-  toast('이의 제기를 인정합니다. 재생성합니다.', 3500);
+  toast(T('Objection upheld. Rewriting.'), 3500);
   renderLog('keep');
   // only a lasting fact goes into the corrections kept for the next turns; a passing detail fixes this reply and nothing more
   await rewriteLast({
-    reason: `설정이나 기억과 어긋났다: ${fact}`,
+    reason: pl('Contradicted the lore or memory: {fact}', { fact }),
     remember,
     noCheck,
     objection: Object.assign({ fact }, judge || {}),
@@ -183,7 +196,7 @@ async function rewriteLast(fix = null, again = false) {
   }
   const prevSnap = [...app.turns].reverse().find(t => t.snap && t.i < last.i);
   if (!prevSnap) {
-    toast('되돌릴 지점이 없어요');
+    toast(T('Nothing to roll back to'));
     return;
   }
   try {
@@ -194,10 +207,10 @@ async function rewriteLast(fix = null, again = false) {
       await storeError(e);
       const now = app.turns[app.turns.length - 1]; // another device or tab moved this save on: reload, then carry on only if the same reply is still the last
       if (now && now.kind === 'ai' && now.i === want.i && now.at === want.at) {
-        toast('최신으로 불러와서 다시 쓰기를 이어서 해요');
+        toast(T('Loaded the latest; continuing the rewrite'));
         return rewriteLast(fix, true);
       }
-      toast('다른 곳에서 이야기가 더 진행돼서 다시 쓰기를 멈췄어요. 최신 화면에서 다시 눌러 주세요', 4500);
+      toast(T('The story moved on somewhere else, so the rewrite stopped. Press it again on the latest screen'), 4500);
       return;
     }
     await storeError(e);
@@ -246,7 +259,7 @@ async function rerollIntro(last, sys, fix) {
   app.state.introReq = uid();
   app.state.introText =
     app.state.introText ||
-    fillTemplate(prompts.intro, {
+    fillTemplate(pr('intro'), {
       extra: lifeExtra(app.state.life),
       opening: '',
       world: app.state.life.world.name,
@@ -265,10 +278,10 @@ export async function fork(i) {
   if (!isIdle()) return;
   const t = app.turns.find(x => x.i === i);
   if (!t || !t.snap) {
-    toast('이 지점에서는 분기할 수 없어요');
+    toast(T("You can't branch from here"));
     return;
   }
-  if (!(await askConfirm('이 지점에서 새로운 분기를 만들까요? 원래 기록은 그대로 남습니다.'))) return;
+  if (!(await askConfirm(T('Start a new branch from this point? The original record stays as it is.')))) return;
   await exclusive(() => makeBranch(t, i));
 }
 // a new save holding the rows up to turn i and the state saved with it; the original is not touched
@@ -279,7 +292,7 @@ async function makeBranch(t, i) {
   );
   const meta = {
     id: uid(),
-    name: `${app.currentSave.name} (분기)`,
+    name: T('{name} (branch)', { name: app.currentSave.name }),
     createdAt: nowIso(),
     updatedAt: nowIso(),
     parent,
@@ -288,7 +301,7 @@ async function makeBranch(t, i) {
     store: 2,
     pages: 0,
   };
-  toast('분기 복사 중...');
+  toast(T('Copying the branch...'));
   try {
     meta.pages = await turnStore.copyUpTo(app.currentSave.id, meta.id, i);
   } catch (e) {
@@ -301,5 +314,5 @@ async function makeBranch(t, i) {
   await dset(`saves/items/${meta.id}`, meta);
   app.saves.unshift(meta);
   await openSave(meta.id, { keepAction: true });
-  toast('새 분기에서 이어집니다');
+  toast(T('Continuing in the new branch'));
 }

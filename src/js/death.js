@@ -8,20 +8,21 @@ import { cueScore } from './sound.js';
 import { pushTurn } from './persistence.js';
 import { renderLog } from './log.js';
 import { sampleError } from './turn.js';
-import { fillTemplate, prompts, turnText } from './prompt.js';
+import { fillTemplate, pl, pr, prLang, turnText } from './prompt.js';
+import { T } from './i18n.js';
 
 export function deathPanel() {
   if (app.state.pendingInherit !== undefined)
-    return `<div class="turn"><div class="row death-actions"><button class="btn primary" id="regressBtn">회귀하기</button></div></div>`;
-  return `<div class="turn death"><h4>사망</h4><p class="death-lead">${app.state.lifeNo}번째 삶이 끝났습니다.</p><button class="btn primary" id="ledgerBtn">인생 결산</button></div>`;
+    return `<div class="turn"><div class="row death-actions"><button class="btn primary" id="regressBtn">${T('Regress')}</button></div></div>`;
+  return `<div class="turn death"><h4>${T('Death')}</h4><p class="death-lead">${T('Life {n} has ended.', { n: app.state.lifeNo })}</p><button class="btn primary" id="ledgerBtn">${T('Life Review')}</button></div>`;
 }
 export function ledgerCard(o, ti) {
   if (!o) return '';
-  return `<div class="death"><h4>인생 결산</h4><div class="row ledger-score-row"><span class="score">${esc(o.score)}</span><span class="muted">점</span></div>
+  return `<div class="death"><h4>${T('Life Review')}</h4><div class="row ledger-score-row"><span class="score">${esc(o.score)}</span><span class="muted">${T('pts')}</span></div>
    <p class="ledger-epitaph">${esc(o.epitaph || '')}</p><p class="muted ledger-summary">${esc(o.summary || '')}</p>
    ${(o.highlights || []).map(h => `<div class="skill"><div><p class="ledger-highlight">${esc(h)}</p></div></div>`).join('')}
-   ${o.inherit && o.inherit.name ? `<div class="item ledger-inherit"><div class="m">다음 생으로 계승</div><div class="t"><span class="tier ${o.inherit.grade}">${o.inherit.grade}</span> ${esc(o.inherit.name)}</div><div class="m">${esc(o.inherit.desc || '')}</div></div>` : ''}
-   ${ti !== undefined ? `<div class="row actions"><button class="btn" data-card="${ti}">공유 카드</button>${platform.memMode || platform.localMode ? '' : `<button class="btn ${o.hallId ? 'ghost' : 'primary'}" data-hall="${ti}" ${o.hallId ? 'disabled' : ''}>${o.hallId ? '전당에 올림' : '전당에 올리기'}</button>`}</div>` : ''}</div>`;
+   ${o.inherit && o.inherit.name ? `<div class="item ledger-inherit"><div class="m">${T('Carried into the next life')}</div><div class="t"><span class="tier ${o.inherit.grade}">${o.inherit.grade}</span> ${esc(o.inherit.name)}</div><div class="m">${esc(o.inherit.desc || '')}</div></div>` : ''}
+   ${ti !== undefined ? `<div class="row actions"><button class="btn" data-card="${ti}">${T('Share card')}</button>${platform.memMode || platform.localMode ? '' : `<button class="btn ${o.hallId ? 'ghost' : 'primary'}" data-hall="${ti}" ${o.hallId ? 'disabled' : ''}>${o.hallId ? T('In the Hall') : T('Post to the Hall')}</button>`}</div>` : ''}</div>`;
 }
 export function runLedger() {
   return exclusive(writeLedger);
@@ -38,7 +39,7 @@ async function writeLedger() {
   try {
     const recent = app.turns.slice(-16).map(turnText).join('\n\n');
     const o = await platform.sample.json(
-      fillTemplate(prompts.ledger, {
+      fillTemplate(pr('ledger'), {
         name: app.state.life.name,
         cap,
         world: app.state.life.world.name,
@@ -47,15 +48,14 @@ async function writeLedger() {
         tier: app.state.life.originTier,
         age: app.state.stats.age,
         power: app.state.stats.power,
-        title: app.state.title,
+        title: app.state.title || pl('None'),
         skills: app.state.skills.map(k => k.name + '(' + k.grade + ')').join(', '),
         summary: app.state.summaries
           .filter(x => x.life === app.state.lifeNo)
           .map(x => x.text)
           .join(' '),
         recent: recent.slice(-8000),
-        langLine:
-          app.settings.lang === 'en' ? prompts.ledgerLangEn : app.settings.lang === 'ja' ? prompts.ledgerLangJa : '',
+        langLine: prLang('ledgerLang'),
       }),
       { modelTier: setting('tier'), cache: false },
     );

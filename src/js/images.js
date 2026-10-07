@@ -4,6 +4,7 @@ import { esc, pick } from './util.js';
 import { EMO_FB, WORLD_ALIAS, WORLDS } from './data.js';
 import { app } from './app.js';
 import { canonName } from './people.js';
+import { T } from './i18n.js';
 
 export const imgUrl = id => host().assetUrl(id);
 export function sceneHtml(sc, people) {
@@ -91,7 +92,7 @@ export function fitsWorld(x, w) {
 }
 export function worldChips(sel, attr) {
   const cur = new Set(sel || []);
-  return `<div class="seg world-chips">${WORLDS.map(w => `<button type="button" ${attr}="${w.id}" aria-pressed="${cur.has(w.id)}" class="chip-sm">${w.name}</button>`).join('')}</div><div class="muted world-chips-note">아무것도 안 고르면 모든 세계</div>`;
+  return `<div class="seg world-chips">${WORLDS.map(w => `<button type="button" ${attr}="${w.id}" aria-pressed="${cur.has(w.id)}" class="chip-sm">${T(w.name)}</button>`).join('')}</div><div class="muted world-chips-note">${T('None selected means every world')}</div>`;
 }
 export function bgKey(x) {
   return String(x.name || '').replace(/^bg[_-]/, '');

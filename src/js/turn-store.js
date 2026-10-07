@@ -2,6 +2,7 @@
 import { noteIgnored, pad } from './util.js';
 import { dset, inflate, packTurn, platform, thaw, userCol, userDoc } from './db.js';
 import { app } from './app.js';
+import { T } from './i18n.js';
 
 export const DB_DOC_CAP = 5000; // documents per artifact database
 const TEXT_ENCODER = new TextEncoder();
@@ -10,7 +11,7 @@ export const savePageDoc = (id, p) => userDoc(`saves/items/${id}/pages/${pad(p)}
 const savePagesCol = id => userCol(`saves/items/${id}/pages`);
 class StoreConflict extends Error {
   constructor() {
-    super('다른 기기에서 이 저장이 진행됐어요');
+    super(T('This save moved on from another device'));
     this.code = 'conflict';
   }
 }
@@ -105,7 +106,7 @@ export const turnStore = {
     const have = new Set(pageRows.map(r => r.i));
     const missing = legacy.filter(r => !have.has(r.i));
     if (missing.length) {
-      onStat && onStat('저장 형식 정리 중');
+      onStat && onStat(T('Updating the save format'));
       const merged = [...pageRows, ...missing].sort((x, y) => x.i - y.i);
       const before = await this.countPages(id);
       const pages = this.paginate(merged);
@@ -202,7 +203,7 @@ export const turnStore = {
         rows.push(...(pg.rows || []));
         after = pg.p;
       }
-      onStat && onStat(`${rows.length}턴 읽는 중`);
+      onStat && onStat(T('Reading {n} {n|turn|turns}', { n: rows.length }));
       if (r.docs.length < 10) break;
     }
     return await inflate(rows);

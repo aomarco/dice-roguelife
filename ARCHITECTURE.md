@@ -20,10 +20,12 @@
 | `src/index.html` | 페이지 틀. `<!-- build:styles -->`, `<!-- build:scripts -->`, `<!-- build:version -->` 자리에 빌드가 내용을 넣습니다. |
 | `src/styles.css` | 전체 스타일. 라이트, 다크, 은밀 모드(`html.discreet`) 테마 변수 포함 |
 | `src/js/*.js` | 게임 코드 (아래 표) |
-| `prompts.json` | 내레이터 프롬프트 문장들. `prompt.js`가 가져와(`import`) `PR_DEFAULT`가 됩니다. |
+| `prompts.json` | 내레이터 프롬프트 문장들. `prompt.js`가 가져와(`import`) `PR_DEFAULT`가 됩니다. 영어 이야기는 `en` 아래의 영어판을 씁니다(`pr`). |
+| `src/locales/ko.json` | 화면 글자의 한국어(영어 원문 → 한국어). 아래 "번역" |
 | `tools/build.js` | 페이지 조립: esbuild로 `src/js/main.js`부터 모든 모듈과 `prompts.json`을 스크립트 하나로 묶고(버전은 `__APP_VERSION__`), `index.html`에 스타일, 스크립트, 버전을 넣습니다. |
 | `tools/release.js` | 검사, 테스트, 버전 올리기, 패키지 ([RELEASING.md](RELEASING.md)) |
 | `tools/comment-scan.js` | `//` 주석이 코드를 삼킨 흔적 찾기 |
+| `tools/i18n-check.js` | 번역 검사: 한국어가 없는 키, 코드에 남은 한국어 (`npm run lint`에 포함) |
 | `tools/shot-sys-lines.js` | 시스템 줄 배치를 눈으로 확인할 스크린샷 (테스트 아님) |
 | `tests/` | Playwright 테스트(`*.spec.js`, 설정은 `playwright.config.js`). `support/test.js`(페이지를 여는 `game` 픽스처), `support/harness.js`(목 DB, 가짜 Claude, 새 삶 시작, `check`), `support/global-setup.js`(한 번 빌드), `support/dbmock.js`, `fixtures/library.json`(축소한 실제 이미지 목록). 페이지 안은 `window.DR`로 들여다봅니다. |
 
@@ -46,6 +48,8 @@
 | --- | --- |
 | **바탕** | |
 | `host.js`, `host-claude.js` | 호스트 어댑터: 게임이 쓰는 기능의 계약과 claude.ai 아티팩트 구현(아래 "호스트 어댑터") |
+| `i18n.js` | 화면 언어(`uiLang`), 번역(`T`, `Tc`, `tIn`, `N_`), 고정 글자 번역(`translateStatic`) |
+| `enums.js` | 저장하고 비교하는 값(성별, 출신, 성좌 관계, 스킬 출처, 무공 칸)과 그 이름, 옛 저장의 한국어 값(`LEGACY`) |
 | `util.js` | 정직한 주사위(`rnd`는 `crypto.getRandomValues`), 공용 도우미(`$`, `esc`, `clone`, `toast`, `noteIgnored`, `cutLine`, `sha256Hex`), 서술 표시(`MARK_RE`) |
 | `data.js` | 데이터 테이블: 등급과 확률(`rollTier`, `tierRank`), 세계, 종족, 신분, 재능, 명령어(`CMDS`, 특성 표 `COMMAND_TYPES`와 `cmdIs`), 감정, 무림 경지 |
 | `limits.js` | 남기는 양(`LIMITS`): 답 하나의 글자 수와 항목 수, 저장이 평생 들고 있는 양(`kept`), 한 답이 움직일 수 있는 양(`move`) |
@@ -91,6 +95,18 @@
 | `images-view.js` | 이미지 탭: 업로드, 자동 분류, 매니페스트 저장, 중복 정리 |
 | `debug.js` | 디버그 핸들 `window.DR` (위 "모듈 규칙") |
 | `main.js` | 진입점: 이벤트 연결, 탭 화면 넘기기, 그다음 `boot` |
+
+## 번역
+
+규칙은 [CLAUDE.md](CLAUDE.md)의 "Translation"에 있습니다. 요점만:
+
+- 원문은 영어입니다. 코드는 `T('Saved')`처럼 영어를 쓰고, 한국어는 `src/locales/ko.json`에 영어를 키로 둡니다. 일본어는
+  같은 키로 `ja.json`을 더하면 됩니다.
+- 화면 언어(`uiLang`)와 이야기 언어(`lang`, 기본은 화면 언어)는 따로입니다. 새 삶의 세계, 종족, 신분, 재능은 이야기 언어로
+  저장되고, 프롬프트도 이야기 언어로 만듭니다(`promptLang`, `pr`, `pl`).
+- 처음 온 플레이어는 브라우저 언어(한국어가 아니면 영어)로 시작하고, 설정이 있던 기존 플레이어는 한국어를 유지합니다(`boot.js`).
+- 저장하는 값은 언어와 무관한 값(`enums.js`)입니다. 옛 저장의 한국어 값은 `compat`이 바꿉니다.
+- 내레이터 답에서 코드가 읽는 표시(성공 확률, 날짜, 시각, 시스템 줄)는 정규식이 한국어와 영어를 모두 받습니다.
 
 ## 호스트 어댑터
 

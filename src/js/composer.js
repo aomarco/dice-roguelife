@@ -1,9 +1,11 @@
 /* ============ composer & slash menu ============ */
 import { $, toast } from './util.js';
-import { CMDS } from './data.js';
+import { cmdName, CMDS } from './data.js';
 import { app } from './app.js';
 import { openStatus } from './status.js';
-import { INPUT_PH } from './log.js';
+import { inputPh } from './log.js';
+import { N_, T } from './i18n.js';
+import { pl } from './prompt.js';
 import { openSettingsSheet } from './settings-sheet.js';
 import { send } from './turn.js';
 
@@ -39,8 +41,8 @@ export function bindComposer() {
     applyEnterHint();
     toast(
       e.target.checked
-        ? '이 브라우저: 엔터로 보내요 (Shift+Enter 줄바꿈)'
-        : '이 브라우저: 엔터는 줄바꿈, Shift+Enter로 보내요',
+        ? T('This browser: Enter sends (Shift+Enter for a new line)')
+        : T('This browser: Enter adds a new line, Shift+Enter sends'),
     );
   };
   input.addEventListener('input', () => {
@@ -89,10 +91,10 @@ export function syncEnterTog() {
 export function applyEnterHint() {
   syncEnterTog();
   input.placeholder = isTouch()
-    ? INPUT_PH
+    ? inputPh()
     : enterSends()
-      ? INPUT_PH + ' (Shift+Enter 줄바꿈)'
-      : INPUT_PH + ' (Shift+Enter로 보내기)';
+      ? inputPh() + T(' (Shift+Enter for a new line)')
+      : inputPh() + T(' (Shift+Enter to send)');
 }
 export function setSendMode(abort) {
   // given the reply's AbortController, the send button becomes a stop button for it
@@ -101,7 +103,8 @@ export function setSendMode(abort) {
   if (!b) return;
   b.disabled = false;
   b.title = '';
-  b.textContent = stop ? '중지' : '보내기';
+  b.dataset.en = stop ? N_('Stop') : N_('Send'); // translateStatic keeps the label in the screen's language
+  b.textContent = T(b.dataset.en);
   b.classList.toggle('danger', stop);
   b.classList.toggle('primary', !stop);
   b.type = stop ? 'button' : 'submit';
@@ -154,21 +157,21 @@ function slashMenu() {
   box.innerHTML = m
     .map(
       c =>
-        `<button type="button" data-k="${c.k}"><code>${c.k}</code><span class="muted">${c.d} <span class="cmd-alias">${(c.a || []).join(' ')}</span></span></button>`,
+        `<button type="button" data-id="${c.id}"><code>${cmdName(c.id)}</code><span class="muted">${T(c.d)} <span class="cmd-alias">${[c.k, ...(c.a || [])].filter(k => k !== cmdName(c.id)).join(' ')}</span></span></button>`,
     )
     .join('');
   box.classList.remove('hidden');
   box.querySelectorAll('button').forEach(
     b =>
       (b.onclick = () => {
-        const k = b.dataset.k;
+        const c = CMDS.find(x => x.id === b.dataset.id);
         box.classList.add('hidden');
-        if (k === '/상태') {
+        if (c.t === 'status') {
           input.value = '';
           openStatus();
           return;
         }
-        input.value = k + ' ';
+        input.value = cmdName(c.id) + ' ';
         input.focus();
       }),
   );
@@ -184,7 +187,11 @@ export function parseCmd(text) {
   for (const c of CMDS)
     for (const k of [c.k, ...(c.a || [])]) {
       if (t.toLowerCase() === k || t.toLowerCase().startsWith(k + ' '))
-        return { type: c.t, arg: [c.preset, t.slice(k.length).trim()].filter(Boolean).join(' ') };
+        return {
+          type: c.t,
+          id: c.id,
+          arg: [c.preset && pl(c.preset), t.slice(k.length).trim()].filter(Boolean).join(' '),
+        };
     }
   return null;
 }
