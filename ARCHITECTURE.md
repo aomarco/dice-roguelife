@@ -27,7 +27,7 @@
 | `tools/comment-scan.js` | `//` 주석이 코드를 삼킨 흔적 찾기 |
 | `tools/i18n-check.js` | 번역 검사: 한국어가 없는 키, 코드에 남은 한국어 (`npm run lint`에 포함) |
 | `tools/shot-sys-lines.js` | 시스템 줄 배치를 눈으로 확인할 스크린샷 (테스트 아님) |
-| `tools/shots.js` | 가이드 사이트 스크린샷: `node tools/shots.js en` → `docs/images/<이름>-en.png`. 장면 속 이야기는 `tools/shots/<언어>.json`의 가짜 텍스트, 얼굴은 그려 넣은 임시 그림 (`DR_SHOT_ART`로 실제 그림). 화면이 바뀌었을 때만 다시 찍어요 |
+| `tools/shots.js` | 가이드 사이트 스크린샷: `node tools/shots.js en` → `docs/images/<이름>-en.png`. 장면 속 이야기는 `tools/shots/<언어>.json`의 가짜 텍스트, 얼굴은 그려 넣은 임시 그림 (`DR_SHOT_ART`로 실제 그림). 화면이 바뀌었을 때만 다시 찍어요. 찍은 뒤 `tools/site-sizes.js`가 이미지 크기를 `docs/index.html`에 적어요 |
 | `tests/` | Playwright 테스트(`*.spec.js`, 설정은 `playwright.config.js`). `support/test.js`(페이지를 여는 `game` 픽스처), `support/harness.js`(목 DB, 가짜 Claude, 새 삶 시작, `check`), `support/global-setup.js`(한 번 빌드), `support/dbmock.js`, `fixtures/library.json`(축소한 실제 이미지 목록). 페이지 안은 `window.DR`로 들여다봅니다. |
 
 ### 모듈 규칙

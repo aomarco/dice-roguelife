@@ -46,3 +46,5 @@ English is the source language. Each other language is a JSON map keyed by the E
 
 `node tools/shots.js <ko|en|ja> [groups]` captures the site's screenshots into `docs/images/<name>-<lang>.png` with a
 mocked narrator (`tools/shots/<lang>.json`); the site swaps them by language. Recapture after a visible UI change.
+It then writes every image's size per language into `docs/index.html` (`tools/site-sizes.js`), so the page doesn't
+shift while lazy images load and `#section` links land in place. Run that alone after changing an image by hand.

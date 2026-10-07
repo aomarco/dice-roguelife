@@ -9,6 +9,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
 import UPNG from 'upng-js';
 import { build, writePage } from './build.js';
+import { siteSizes } from './site-sizes.js';
 import { claudeMock } from '../tests/support/harness.js';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -794,3 +795,4 @@ for (const g of only.length ? only : Object.keys(GROUPS)) {
   }
 }
 await browser.close();
+siteSizes();
