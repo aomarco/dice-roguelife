@@ -3,7 +3,7 @@
 //   node tools/shots.js ja play extra   some groups (new, play, misc, desk, images, styles, promo, hero, pc, extra)
 // The story in the shots is fake (tools/shots/<lang>.json) and the faces are drawn placeholders. The image-tab shots
 // can show real art instead: DR_SHOT_ART=<folder> with <id>.webp files named as in ART below.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -20,6 +20,7 @@ if (!LOCALES[lang]) {
 }
 const S = JSON.parse(readFileSync(join(ROOT, 'tools', 'shots', `${lang}.json`), 'utf8'));
 const out = name => join(ROOT, 'docs', 'images', `${name}-${lang}.png`);
+const PROMO = join(ROOT, 'tests', 'shots', 'promo');
 
 // Placeholder pictures: a gradient portrait with a face for an emotion, or a skyline for a background.
 const svg = s => 'data:image/svg+xml,' + encodeURIComponent(s).replace(/'/g, '%27');
@@ -606,7 +607,7 @@ const GROUPS = {
     await pg.click('#log .choices [data-choice]');
     await wait(pg, 2800);
     await seed(pg);
-    await say(pg, S.inputs.reddit || '/reddit', 'hero3', 1500);
+    await say(pg, S.inputs.heroBoard, 'hero3', 1500);
     // a viewport tall enough to show everything from the player's first line down, above the input bar
     const span = await pg.evaluate(() => {
       const log = document.querySelector('#log');
@@ -660,10 +661,11 @@ const GROUPS = {
     await pg.click('#log .choices [data-choice]');
     await wait(pg, 2800);
     await seed(pg);
-    const shotFrom = async (text, name) => {
+    // dir: docs/images for the guide, tests/shots/promo (not committed) for images only used in posts
+    const shotFrom = async (text, name, dir = join(ROOT, 'docs', 'images')) => {
       const span = await pg.evaluate(text => {
         const log = document.querySelector('#log');
-        const first = [...log.querySelectorAll('.turn.u')].find(t => t.textContent.includes(text));
+        const first = [...log.querySelectorAll('.turn.u')].filter(t => t.textContent.includes(text)).pop();
         const top = first.getBoundingClientRect().top - log.getBoundingClientRect().top + log.scrollTop;
         return { top, content: log.scrollHeight - top, chrome: window.innerHeight - log.clientHeight };
       }, text);
@@ -671,15 +673,16 @@ const GROUPS = {
       await pg.evaluate(top => (document.querySelector('#log').scrollTop = top - 8), span.top);
       await wait(pg, 600);
       await clean(pg);
-      await pg.screenshot({ path: join(ROOT, 'docs', 'images', `${name}-${lang}.jpg`), type: 'jpeg', quality: 90 });
+      mkdirSync(dir, { recursive: true });
+      await pg.screenshot({ path: join(dir, `${name}-${lang}.jpg`), type: 'jpeg', quality: 90 });
       console.log('  ' + name);
     };
     await shotFrom(S.inputs.hero, 'pc-play');
-    // the status window a few turns on: awakened, titled, with skills and a new quest
-    await pg.evaluate(() => {
+    // the status window a few turns on: awakened, titled, with skills and a new quest (tools/shots/<lang>.json heroStatus)
+    await pg.evaluate(h => {
       const s = DR.app.state;
       s.statusUnlocked = true;
-      s.life.race = 'Human (Awakened)';
+      s.life.race = h.race;
       Object.assign(s.stats, {
         hp: 96,
         maxHp: 120,
@@ -692,27 +695,31 @@ const GROUPS = {
         cha: 5,
         mag: 8,
       });
-      s.energy = { name: 'Mana', cur: 42, max: 60 };
-      s.titles = ['Sewer Cartographer', 'Alley Survivor', 'Famous Regular'];
-      s.titleFx = {
-        'Sewer Cartographer': '+10% when selling information',
-        'Alley Survivor': '+3 to crisis checks',
-        'Famous Regular': '-5% shop prices',
-      };
-      s.titlesOn = ['Sewer Cartographer', 'Alley Survivor'];
-      s.skills.push(
-        { name: 'Pathfinder', grade: 'B', desc: 'Never loses the way underground', src: 'gained', lv: 3, at: s.next },
-        { name: 'Haggle', grade: 'C', desc: 'Gets a better price, once per deal', src: 'gained', lv: 2 },
-      );
-      s.quests.push({ title: 'Who else wants C-3?', status: 'active', note: 'Two men in suits asked about the map' });
-      s.stateNote = 'Sold a real gate map to the hunter Mira. Word is spreading on GateWatch.';
-    });
+      s.energy = { name: h.energy, cur: 42, max: 60 };
+      s.titles = h.titles.map(t => t[0]);
+      s.titleFx = Object.fromEntries(h.titles);
+      s.titlesOn = h.titlesOn.map(i => h.titles[i][0]);
+      for (const k of h.skills) s.skills.push({ ...k, src: 'gained', ...(k.new ? { at: s.next } : {}) });
+      s.quests.push({ ...h.quest, status: 'active' });
+      s.stateNote = h.stateNote;
+    }, S.heroStatus);
     await pg.setViewportSize({ width: 760, height: 1500 });
     await pg.click('#strip');
     await wait(pg, 900);
     await clean(pg);
     await pg.screenshot({ path: join(ROOT, 'docs', 'images', `pc-status-${lang}.jpg`), type: 'jpeg', quality: 90 });
     console.log('  pc-status');
+    await closeSheet(pg);
+    // the city reacting on every board look, then Mira's messages on every messenger look
+    for (const look of ['reddit', '5ch', 'nico', 'dc']) {
+      await say(pg, '/' + look, 'hero3', 1500);
+      await shotFrom('/' + look, `pc-board-${look}`, PROMO);
+    }
+    for (const look of ['whatsapp', 'line', 'kakao']) {
+      await pg.evaluate(l => (DR.app.settings.chatStyle = l), look);
+      await say(pg, S.inputs.heroChat, 'heroChat', 1500);
+      await shotFrom(S.inputs.heroChat, `pc-chat-${look}`, PROMO);
+    }
     await ctx.close();
   },
 

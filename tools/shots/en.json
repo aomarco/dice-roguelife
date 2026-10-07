@@ -11,7 +11,9 @@
     "news": "/news",
     "quest": "/quest",
     "star": "/star",
-    "hero": "Look for someone to buy my map"
+    "hero": "Look for someone to buy my map",
+    "heroBoard": "/reddit",
+    "heroChat": "/chat Mira, you there?"
   },
   "free": {
     "origin": "Night-shift convenience store clerk",
@@ -409,13 +411,98 @@
             "likes": 640,
             "comments": 388
           }
-        ]
+        ],
+        "post": {
+          "title": "A kid near Mangwon station sells sewer gate maps and they are ACCURATE",
+          "author": "core_runner",
+          "views": 18400,
+          "body": "Bought one off a kid outside the convenience store by Mangwon station. Pencil, hand-drawn, red X on C-3. Went down at 2am with my party and the entrance was exactly there. Nobody had it logged. The kid charged me 30k. I would have paid 300k.",
+          "likes": 932,
+          "dislikes": 12,
+          "comments": [
+            {
+              "author": "awakened5yrs",
+              "text": "The Association will be at that store by morning. Watch."
+            },
+            {
+              "author": "",
+              "text": "^ that kid is going to need a bodyguard",
+              "reply": true
+            },
+            {
+              "author": "ratwatcher",
+              "text": "is the convenience store guy ok"
+            },
+            {
+              "author": "gatewatch_mod",
+              "text": "Reminder: no exact gate coordinates in threads"
+            }
+          ]
+        }
       },
       "choices": [
         "Reply to the thread as the mapmaker (success chance 35%)",
         "Sell three more maps before dawn (success chance 50%)",
         "Lie low tonight"
       ]
+    },
+    "heroChat": {
+      "admin": "Texting a hunter after midnight. Bold, or lonely.",
+      "narration": "Your phone lights up almost at once.",
+      "widget": {
+        "type": "messenger",
+        "app": "Chirp",
+        "room": "Mira",
+        "messages": [
+          {
+            "from": "Me",
+            "text": "Mira, you there?",
+            "me": true
+          },
+          {
+            "from": "Mira",
+            "text": "Two men came asking about your map."
+          },
+          {
+            "from": "Mira",
+            "text": "Suits. Association pins."
+          },
+          {
+            "from": "Mira",
+            "text": "Don't go home tonight. I'll send you a place."
+          }
+        ]
+      }
     }
+  },
+  "heroStatus": {
+    "race": "Human (Awakened)",
+    "energy": "Mana",
+    "titles": [
+      ["Sewer Cartographer", "+10% when selling information"],
+      ["Alley Survivor", "+3 to crisis checks"],
+      ["Famous Regular", "-5% shop prices"]
+    ],
+    "titlesOn": [0, 1],
+    "skills": [
+      {
+        "name": "Pathfinder",
+        "grade": "B",
+        "desc": "Never loses the way underground",
+        "lv": 3,
+        "new": true
+      },
+      {
+        "name": "Haggle",
+        "grade": "C",
+        "desc": "Gets a better price, once per deal",
+        "lv": 2
+      }
+    ],
+    "quest": {
+      "title": "Who else wants C-3?",
+      "note": "Two men in suits asked about the map"
+    },
+    "stateNote": "Sold a real gate map to the hunter Mira. Word is spreading on GateWatch."
   }
 }
