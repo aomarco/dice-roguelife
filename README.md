@@ -1,6 +1,6 @@
-English | [???](README.ko.md) | [???](README.ja.md)
+English | [한국어](README.ko.md) | [日本語](README.ja.md)
 
-# Dice Roguelife ? standalone, bring your own AI
+# Dice Roguelife — standalone, bring your own AI
 
 A text roguelike where dice decide your world, character and fate, and an AI narrates your life.
 Die, return in a new body, and carry something forward. This modified checkout runs in a normal browser:
@@ -15,7 +15,7 @@ npm ci
 npm start
 ```
 
-Open **http://localhost:3000**, then **Settings ? AI connection**:
+Open **http://localhost:3000**, then **Settings → AI connection**:
 
 1. Choose a provider or local model server.
 2. Paste your API key, if required.
@@ -63,7 +63,7 @@ The loopback relay avoids browser CORS restrictions and does not persist keys on
 Saves, settings and uploaded portraits/backgrounds persist in IndexedDB in this browser.
 They survive reloads, but clearing browser data removes them. There is no automatic cloud synchronization.
 
-- Export game backups from **Saves ? Save file**; import the same files into another installation.
+- Export game backups from **Saves → Save file**; import the same files into another installation.
 - Existing Claude artifact save exports use the same format and can be imported here.
 - Export images and tags from the Images tab; upload images and import tags in another installation.
 - Export stories as Markdown or HTML; HTML exports embed the images they display.
