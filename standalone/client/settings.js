@@ -56,11 +56,13 @@ function panelHtml() {
     ${field('apiModel', tr('Model ID (Azure: deployment name)'), 'autocomplete="off"')}
     ${field('apiSummary', tr('Summary model ID (optional)'), 'autocomplete="off"')}
     ${field('apiVersion', tr('Azure API version'), 'placeholder="2024-10-21"')}
+    ${check('apiVision', tr('Enable image analysis (vision model required)'))}
+    <details class="api-advanced"><summary>${tr('Advanced')}</summary>
     <div class="row"><div class="field grow"><label for="apiMax">${tr('Maximum output tokens')}</label><input id="apiMax" type="number" min="64" max="65536"></div><div class="field grow"><label for="apiBudget">${tr('Prompt byte limit')}</label><input id="apiBudget" type="number" min="1000" max="2000000"></div></div>
     <div class="field"><label for="apiRetries">${tr('Retries for rate limits or server errors')}</label><select id="apiRetries">${opts(['0', '1', '2'].map(n => [n, n]))}</select></div>
     ${check('apiStream', tr('Stream replies'))}
     ${check('apiJson', tr('Request JSON mode (only if supported by the model)'))}
-    ${check('apiVision', tr('Enable image analysis (vision model required)'))}
+    </details>
     <p class="muted">${tr('API calls may cost money. Retries can make extra calls. Fast uses the summary model; Standard and Deep use the narration model. The connection and key are kept on this computer, never in game saves or exports.')}</p>
     <div class="row"><button class="btn" id="apiSave">${tr('Save connection')}</button><button class="btn ghost" id="apiTest">${tr('Test connection (one API call)')}</button><button class="btn ghost" id="apiDelete">${tr('Delete profile')}</button></div>
     <p id="apiStatus" role="status" class="muted"></p>
@@ -120,6 +122,7 @@ export function bindProviderSettings(root) {
   const q = id => root.querySelector('#api' + id);
   const status = text => (q('Status').textContent = text);
   let armed = false; // Delete was pressed once
+  const azureOnly = () => (q('Version').closest('.field').hidden = q('Protocol').value !== 'azure');
   // the profile list, then the chosen profile's settings (a new one starts from the defaults)
   const show = name => {
     const names = profileNames();
@@ -136,6 +139,7 @@ export function bindProviderSettings(root) {
     q('Delete').disabled = !name;
     q('Delete').textContent = tr('Delete profile');
     armed = false;
+    azureOnly();
   };
   const afterChange = async () => {
     platform.limits = await platform.sample.limits();
@@ -176,7 +180,9 @@ export function bindProviderSettings(root) {
     q('Endpoint').value = p.endpoint;
     q('Protocol').value = p.protocol;
     q('Key').value = q('Model').value = q('Summary').value = '';
+    azureOnly();
   };
+  q('Protocol').onchange = azureOnly;
   const save = async () => {
     const next = {};
     for (const [id, key] of Object.entries(TEXT)) next[key] = q(id).value.trim();

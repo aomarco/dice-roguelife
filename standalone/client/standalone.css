@@ -15,6 +15,12 @@
   width: 100%;
   min-width: 0;
 }
+.api-advanced {
+  margin-top: 10px;
+}
+.api-advanced > summary {
+  cursor: pointer;
+}
 .provider-fields .grow {
   min-width: 0;
 }

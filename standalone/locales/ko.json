@@ -61,5 +61,6 @@
   "To play on your phone, run tailscale serve --bg {port} on this computer and add the name it prints here.": "폰에서 하려면 이 컴퓨터에서 tailscale serve --bg {port}를 실행하고, 나오는 이름을 여기에 적으세요.",
   "Saved. Restart npm start to use the new port or data folder.": "저장했어요. 새 포트나 데이터 폴더는 npm start를 다시 실행하면 적용돼요.",
   "Saved.": "저장했어요.",
-  "Check the port (1 to 65535), the data folder and the names.": "포트(1~65535), 데이터 폴더, 이름을 확인하세요."
+  "Check the port (1 to 65535), the data folder and the names.": "포트(1~65535), 데이터 폴더, 이름을 확인하세요.",
+  "Advanced": "고급 설정"
 }
