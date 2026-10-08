@@ -41,5 +41,16 @@
   "The model context limit was exceeded. Reduce recent memory.": "모델이 한 번에 읽을 수 있는 양을 넘었어요. 최근 기억을 줄여 주세요.",
   "The provider refused this request.": "제공업체가 이 요청을 거부했어요.",
   "The reply was not valid JSON.": "답이 올바른 JSON이 아니에요.",
-  "Request failed.": "요청에 실패했어요."
+  "Request failed.": "요청에 실패했어요.",
+  "Server settings": "서버 설정",
+  "Kept in standalone/config.json on this computer.": "이 컴퓨터의 standalone/config.json에 저장돼요.",
+  "Port": "포트",
+  "Data folder (saves, images, AI connection)": "데이터 폴더 (저장, 이미지, AI 연결)",
+  "Names for other devices, one per line (Tailscale)": "다른 기기에서 접속할 이름, 한 줄에 하나 (Tailscale)",
+  "Save server settings": "서버 설정 저장",
+  "Now: {path}": "현재: {path}",
+  "To play on your phone, run tailscale serve --bg {port} on this computer and add the name it prints here.": "폰에서 하려면 이 컴퓨터에서 tailscale serve --bg {port}를 실행하고, 나오는 이름을 여기에 적으세요.",
+  "Saved. Restart npm start to use the new port or data folder.": "저장했어요. 새 포트나 데이터 폴더는 npm start를 다시 실행하면 적용돼요.",
+  "Saved.": "저장했어요.",
+  "Check the port (1 to 65535), the data folder and the names.": "포트(1~65535), 데이터 폴더, 이름을 확인하세요."
 }

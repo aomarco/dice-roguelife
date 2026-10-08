@@ -8,16 +8,19 @@ import { pipeline } from 'node:stream/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from '../tools/build.js';
 import { apiError, relaySample } from './relay.js';
-import { openStore } from './store.js';
+import { openStore, writeAtomic } from './store.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
 const MAX_JSON = 32_000_000; // a save page or an image analysis request
 const MAX_ASSET = 25_000_000;
 const IDLE = 300_000; // a provider silent this long is given up on (a slow local model still streams)
 
-// standalone/config.json, all optional: port, dataDir (relative to standalone/) and hosts (see README.md)
-export function loadConfig(file = join(HERE, 'config.json')) {
-  const c = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {};
+const CONFIG = join(HERE, 'config.json');
+const readConfig = file => (existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {});
+// standalone/config.json, all optional: port, dataDir (relative to standalone/) and hosts (see README.md); ⚙ Settings
+// edits it too
+export function loadConfig(file = CONFIG) {
+  const c = readConfig(file);
   const out = {};
   if (c.port) out.port = c.port;
   if (c.dataDir) out.dataDir = resolve(HERE, c.dataDir);
@@ -41,13 +44,16 @@ const sendJson = (res, status, value) => {
   res.end(JSON.stringify(value));
 };
 
-// extraHosts: names other devices reach this server by through a proxy on this computer (e.g. `tailscale serve`)
-export async function startServer({
-  port = 3000,
-  dataDir = join(HERE, 'data'),
-  extraHosts = [],
-  fetcher = fetch,
-} = {}) {
+// Options default to config.json. extraHosts: names other devices reach this server by through a proxy on this
+// computer (e.g. `tailscale serve`).
+export async function startServer(options = {}) {
+  const configFile = options.configFile || CONFIG;
+  let {
+    port = 3000,
+    dataDir = join(HERE, 'data'),
+    extraHosts = [],
+    fetcher = fetch,
+  } = { ...loadConfig(configFile), ...options };
   const token = randomBytes(32).toString('hex');
   const store = openStore(dataDir);
   const { html } = await build(undefined, {
@@ -56,6 +62,11 @@ export async function startServer({
   });
   const page = html.replace('<script>', `<script>window.DR_SERVER_TOKEN=${JSON.stringify(token)};`);
   let hosts, origins, cookieName; // set once listening, when the port is known
+  const allow = names => {
+    extraHosts = names;
+    hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...names];
+    origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...names.map(h => 'https://' + h)];
+  };
 
   const routes = {
     '/api/db': async req => store.docOp(await readJson(req)),
@@ -77,6 +88,25 @@ export async function startServer({
     '/api/connection/get': async () => {
       const { config, apiKey } = store.connection.get();
       return { config, hasKey: !!apiKey };
+    },
+    // ⚙ Settings → Server: the port and data folder apply at the next start, the names at once
+    '/api/server/get': async () => ({
+      port,
+      dataDir: readConfig(configFile).dataDir || 'data',
+      dataPath: dataDir,
+      hosts: extraHosts,
+    }),
+    '/api/server/set': async req => {
+      const next = await readJson(req, 10_000);
+      const okHost = h => typeof h === 'string' && /^[a-z0-9-]+(\.[a-z0-9-]+)*$/i.test(h);
+      if (!Number.isInteger(next.port) || next.port < 1 || next.port > 65535) throw apiError('invalid_config', 'Port');
+      if (!Array.isArray(next.hosts) || next.hosts.length > 10 || !next.hosts.every(okHost))
+        throw apiError('invalid_config', 'Hosts');
+      if (typeof next.dataDir !== 'string' || !next.dataDir.trim()) throw apiError('invalid_config', 'Data folder');
+      const saved = { ...readConfig(configFile), port: next.port, dataDir: next.dataDir.trim(), hosts: next.hosts };
+      writeAtomic(configFile, JSON.stringify(saved, null, 2) + '\n');
+      allow(next.hosts);
+      return { restart: next.port !== port || resolve(HERE, saved.dataDir) !== resolve(dataDir) };
     },
     '/api/connection/set': async req => {
       const next = await readJson(req, 100_000);
@@ -143,8 +173,7 @@ export async function startServer({
     server.listen(port, '127.0.0.1', resolve);
   });
   port = server.address().port;
-  hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...extraHosts];
-  origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...extraHosts.map(h => 'https://' + h)];
+  allow(extraHosts);
   cookieName = `dr_token_${port}`; // cookies aren't kept apart by port
   return server;
 }
@@ -185,6 +214,6 @@ async function relay(req, res, store, fetcher) {
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const server = await startServer(loadConfig());
+  const server = await startServer();
   console.log(`Dice Roguelife (standalone): http://localhost:${server.address().port}`);
 }

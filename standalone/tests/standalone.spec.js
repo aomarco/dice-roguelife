@@ -149,3 +149,16 @@ test('Fast uses the summary model, and summaries and Life Reviews work', async (
   expect(await page.evaluate(() => DR.app.turns.some(t => t.kind === 'ledger'))).toBe(true);
   expect(await page.evaluate(() => DR.app.state.pastLives.length)).toBe(1);
 });
+
+test('server settings are edited from ⚙ and kept in config.json', async ({ page }) => {
+  await configure(page);
+  await page.evaluate(() => DR.openSettingsSheet());
+  await page.locator('summary', { hasText: 'Server settings' }).click();
+  await expect(page.locator('#srvPort')).toHaveValue(new URL(url).port);
+  await expect(page.locator('#srvHint')).toContainText('tailscale serve --bg');
+  await page.fill('#srvHosts', 'my-pc.tail1234.ts.net');
+  await page.click('#srvSave');
+  await expect(page.locator('#srvStatus')).toContainText('Saved');
+  const file = JSON.parse(readFileSync(join(s.dataDir, 'config.json'), 'utf8'));
+  expect(file.hosts).toEqual(['my-pc.tail1234.ts.net']);
+});

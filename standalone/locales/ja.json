@@ -41,5 +41,16 @@
   "The model context limit was exceeded. Reduce recent memory.": "モデルが一度に読める量を超えました。最近の記憶を減らしてください。",
   "The provider refused this request.": "プロバイダーがこのリクエストを拒否しました。",
   "The reply was not valid JSON.": "応答が正しい JSON ではありません。",
-  "Request failed.": "リクエストに失敗しました。"
+  "Request failed.": "リクエストに失敗しました。",
+  "Server settings": "サーバー設定",
+  "Kept in standalone/config.json on this computer.": "このコンピューターの standalone/config.json に保存されます。",
+  "Port": "ポート",
+  "Data folder (saves, images, AI connection)": "データフォルダー（セーブ、画像、AI 接続）",
+  "Names for other devices, one per line (Tailscale)": "他の端末から接続する名前、1行に1つ（Tailscale）",
+  "Save server settings": "サーバー設定を保存",
+  "Now: {path}": "現在：{path}",
+  "To play on your phone, run tailscale serve --bg {port} on this computer and add the name it prints here.": "スマホで遊ぶには、このコンピューターで tailscale serve --bg {port} を実行し、表示された名前をここに入力してください。",
+  "Saved. Restart npm start to use the new port or data folder.": "保存しました。新しいポートやデータフォルダーは、npm start を起動し直すと反映されます。",
+  "Saved.": "保存しました。",
+  "Check the port (1 to 65535), the data folder and the names.": "ポート（1〜65535）、データフォルダー、名前を確認してください。"
 }

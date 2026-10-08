@@ -10,7 +10,8 @@
   margin-top: 10px;
 }
 .provider-fields input:not([type='checkbox']),
-.provider-fields select {
+.provider-fields select,
+.provider-fields textarea {
   width: 100%;
   min-width: 0;
 }

@@ -26,7 +26,7 @@ function bindable(v) {
 const metaOf = data =>
   JSON.stringify(Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v !== 'object')));
 // writes a file whole or not at all
-function writeAtomic(path, bytes) {
+export function writeAtomic(path, bytes) {
   writeFileSync(path + '.tmp', bytes);
   renameSync(path + '.tmp', path);
 }

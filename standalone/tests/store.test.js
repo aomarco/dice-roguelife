@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { request } from 'node:http';
 import { connect } from 'node:net';
 import { basename, join } from 'node:path';
 import { loadConfig } from '../server.js';
@@ -132,5 +133,33 @@ test('config.json: port, data folder (relative to standalone/) and extra host na
     assert.deepEqual(loadConfig(join(dir, 'missing.json')), {});
   } finally {
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('server settings from ⚙: written to config.json, names allowed at once, port and folder after a restart', async () => {
+  const s = await openServer();
+  const set = body => s.call('/api/server/set', JSON.stringify(body));
+  const port = Number(new URL(s.url).port);
+  try {
+    const now = await (await s.call('/api/server/get', '{}')).json();
+    assert.deepEqual([now.port, now.dataDir, now.hosts], [port, 'data', []]);
+    const r = await (await set({ port, dataDir: 'data', hosts: ['my-pc.tail1234.ts.net'] })).json();
+    assert.deepEqual(r, { restart: true }); // the test server's data folder isn't standalone/data
+    const file = JSON.parse(readFileSync(join(s.dataDir, 'config.json'), 'utf8'));
+    assert.deepEqual(file, { port, dataDir: 'data', hosts: ['my-pc.tail1234.ts.net'] });
+    const status = await new Promise((resolve, reject) => {
+      const req = request(s.url, { headers: { Host: 'my-pc.tail1234.ts.net' } }, res => {
+        res.resume();
+        resolve(res.statusCode);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    assert.equal(status, 200);
+    assert.equal((await set({ port: 0, dataDir: 'data', hosts: [] })).status, 400);
+    assert.equal((await set({ port, dataDir: 'data', hosts: ['bad host/'] })).status, 400);
+    assert.equal((await set({ port, dataDir: '', hosts: [] })).status, 400);
+  } finally {
+    await s.stop();
   }
 });

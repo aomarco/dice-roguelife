@@ -7,7 +7,7 @@ import { startServer } from '../server.js';
 export const tempDir = () => mkdtempSync(join(tmpdir(), 'dr-standalone-'));
 
 export async function openServer({ dataDir = tempDir(), ...options } = {}) {
-  const server = await startServer({ port: 0, dataDir, ...options });
+  const server = await startServer({ port: 0, dataDir, configFile: join(dataDir, 'config.json'), ...options });
   const url = `http://127.0.0.1:${server.address().port}`;
   const res = await fetch(url);
   const token = /window.DR_SERVER_TOKEN="([a-f0-9]+)"/.exec(await res.text())[1];

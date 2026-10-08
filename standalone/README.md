@@ -59,14 +59,15 @@ import them here. Pictures pinned to past turns don't carry over; portraits for 
 
 The server only answers this computer. To play from your phone as well, install [Tailscale](https://tailscale.com/) on
 the computer and the phone with the same account, then on the computer run `tailscale serve --bg 3000` (allow HTTPS
-when it asks). It prints this computer's address, such as `https://my-pc.tail1234.ts.net`. Add that name to `hosts` in
-`config.json` (below), start the game again with `npm start`, and open the address on the phone.
+when it asks). It prints this computer's address, such as `https://my-pc.tail1234.ts.net`. Add that name in **⚙ Settings →
+Server settings** (or to `hosts` in `config.json`, below) and open the address on the phone.
 
 Only devices on your Tailscale account can reach it. Don't play the same save on two devices at the same time.
 
 ## Server settings (config.json)
 
-The server reads an optional `standalone/config.json` (yours alone: git ignores it). Every field can be left out:
+The server reads an optional `standalone/config.json` (yours alone: git ignores it). Edit it in **⚙ Settings → Server
+settings**, or by hand. Every field can be left out:
 
 ```json
 {
@@ -78,7 +79,8 @@ The server reads an optional `standalone/config.json` (yours alone: git ignores 
 
 - `port`: the port the game is served on (3000).
 - `dataDir`: where saves, images and the AI connection are kept, relative to `standalone/` (`data`).
-- `hosts`: other names this server answers to, for Tailscale (above).
+- `hosts`: other names this server answers to, for Tailscale (above). These apply at once; a new port or folder
+  applies the next time you run `npm start`.
 
 The AI connection itself is chosen in ⚙ Settings and kept in the data folder (`connection.json`).
 
@@ -100,7 +102,7 @@ changing the artifact:
 | `client/host.js`             | The host adapter, joined with `registerHost`: db, assets, sample, user and downloads over the local server                     |
 | `client/net.js`              | Requests to the local server with its token                                                                                    |
 | `client/providers.js`        | Presets, the page's copy of the connection, and the `sample` capability                                                        |
-| `client/settings.js`         | The AI connection panel (the host's `bindSettings`), update steps, the setup banner                                            |
+| `client/settings.js`         | The AI connection and Server settings panels (the host's `bindSettings`), update steps, the setup banner                       |
 | `client/i18n.js`, `locales/` | The add-on's own Korean and Japanese text (`tr()`), on top of the game's catalogs                                              |
 | `client/standalone.css`      | Its styles, added to the standalone page only                                                                                  |
 | `lines.js`                   | Reads a streamed body line by line, for the relay and the page                                                                 |

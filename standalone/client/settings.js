@@ -6,6 +6,7 @@ import { openSettingsSheet } from '../../src/js/settings-sheet.js';
 import { N_ } from '../../src/js/i18n.js';
 import { $, esc } from '../../src/js/util.js';
 import { tr } from './i18n.js';
+import { post } from './net.js';
 import { PROVIDERS, providerConfig, providerHasKey, providerUsage, saveConnection } from './providers.js';
 
 const PROTOCOLS = [
@@ -50,7 +51,50 @@ function panelHtml() {
     <div class="row"><button class="btn" id="apiSave">${tr('Save connection')}</button><button class="btn ghost" id="apiTest">${tr('Test connection (one API call)')}</button></div>
     <p id="apiStatus" role="status" class="muted"></p>
     <p class="muted">${tr('Session usage: {calls} calls, {input} input tokens, {output} output tokens (when reported)', providerUsage)}</p>
+  </div></details>${serverHtml()}`;
+}
+
+// ⚙ Settings → Server settings: standalone/config.json, read and written through the server
+function serverHtml() {
+  return `<details class="diag-box"><summary>${tr('Server settings')}</summary><div class="diag-body provider-fields">
+    <p class="muted">${tr('Kept in standalone/config.json on this computer.')}</p>
+    <div class="field"><label for="srvPort">${tr('Port')}</label><input id="srvPort" type="number" min="1" max="65535"></div>
+    <div class="field"><label for="srvData">${tr('Data folder (saves, images, AI connection)')}</label><input id="srvData" autocomplete="off"></div>
+    <p class="muted" id="srvPath"></p>
+    <div class="field"><label for="srvHosts">${tr('Names for other devices, one per line (Tailscale)')}</label><textarea id="srvHosts" rows="2" placeholder="my-pc.tail1234.ts.net"></textarea></div>
+    <p class="muted" id="srvHint"></p>
+    <div class="row"><button class="btn" id="srvSave">${tr('Save server settings')}</button></div>
+    <p id="srvStatus" role="status" class="muted"></p>
   </div></details>`;
+}
+async function bindServerSettings(root) {
+  const q = id => root.querySelector('#srv' + id);
+  const show = c => {
+    q('Port').value = c.port;
+    q('Data').value = c.dataDir;
+    q('Hosts').value = c.hosts.join('\n');
+    q('Path').textContent = tr('Now: {path}', { path: c.dataPath });
+    q('Hint').textContent = tr(
+      'To play on your phone, run tailscale serve --bg {port} on this computer and add the name it prints here.',
+      { port: c.port },
+    );
+  };
+  show(await (await post('/api/server/get', {})).json());
+  q('Save').onclick = async () => {
+    const next = {
+      port: Number(q('Port').value),
+      dataDir: q('Data').value.trim(),
+      hosts: q('Hosts').value.split(/\s+/).filter(Boolean),
+    };
+    try {
+      const r = await (await post('/api/server/set', next)).json();
+      q('Status').textContent = r.restart
+        ? tr('Saved. Restart npm start to use the new port or data folder.')
+        : tr('Saved.');
+    } catch {
+      q('Status').textContent = tr('Check the port (1 to 65535), the data folder and the names.');
+    }
+  };
 }
 
 // the host's bindSettings (src/js/host.js): runs each time the settings sheet is drawn
@@ -58,6 +102,7 @@ export function bindProviderSettings(root) {
   root.querySelector('.ui-lang-field').insertAdjacentHTML('afterend', panelHtml());
   root.querySelector('#updBtn').onclick = openUpdateSheet;
   if (!providerConfig().model) showSetupBanner(); // again in the screen language, which may have just changed
+  bindServerSettings(root).catch(e => (root.querySelector('#srvStatus').textContent = e.message));
   const q = id => root.querySelector('#api' + id);
   const c = providerConfig();
   for (const [id, key] of Object.entries({ ...TEXT, ...NUMBERS })) q(id).value = c[key] ?? '';
