@@ -1,7 +1,6 @@
 // The standalone page end to end, with the provider mocked: a fresh server and data folder for each test.
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { startLife } from '../../tests/support/harness.js';
 import { openServer } from './support.js';
 
@@ -68,8 +67,7 @@ test('saves live on the server: they survive a reload and export/import without 
   await expect.poll(() => page.evaluate(() => DR.app.currentSave?.id)).toBe(saved.id);
   await expect.poll(() => page.evaluate(() => DR.app.turns.length)).toBe(saved.turns);
   // the key stayed on the server: kept across the reload, never handed to the page
-  const stored = JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8'));
-  expect(stored.profiles['Profile 1'].apiKey).toBe('test-secret-never-export');
+  expect(s.readJson('connection.json').profiles['Profile 1'].apiKey).toBe('test-secret-never-export');
   expect(await page.content()).not.toContain('test-secret');
   await page.evaluate(() => DR.openSettingsSheet());
   await expect(page.locator('#apiKey')).toHaveAttribute('placeholder', /Saved on this computer/);
@@ -155,13 +153,13 @@ test('server settings are edited from ⚙ and kept in config.json', async ({ pag
   await configure(page);
   await page.evaluate(() => DR.openSettingsSheet());
   await page.locator('summary', { hasText: 'Server settings' }).click();
-  await expect(page.locator('#srvPort')).toHaveValue(new URL(url).port);
+  await expect(page.locator('#srvPort')).toHaveValue('3000');
+  await expect(page.locator('#srvNow')).toContainText(new URL(url).port);
   await expect(page.locator('#srvHint')).toContainText('tailscale serve --bg');
   await page.fill('#srvHosts', 'my-pc.tail1234.ts.net');
   await page.click('#srvSave');
   await expect(page.locator('#srvStatus')).toContainText('Saved');
-  const file = JSON.parse(readFileSync(join(s.dataDir, 'config.json'), 'utf8'));
-  expect(file.hosts).toEqual(['my-pc.tail1234.ts.net']);
+  expect(s.readJson('config.json').hosts).toEqual(['my-pc.tail1234.ts.net']);
 });
 
 test('several connection profiles: the one chosen narrates, and one can be deleted', async ({ page }) => {
@@ -190,4 +188,14 @@ test('several connection profiles: the one chosen narrates, and one can be delet
   await expect(page.locator('#apiProfile option')).toHaveText(['Profile 1', '+ New profile']);
   await ask();
   expect(models.at(-1)).toBe('mock-model');
+});
+
+test('the image list the game saves for copies comes back intact', async ({ page }) => {
+  await configure(page);
+  const back = await page.evaluate(async () => {
+    const blob = new Blob([JSON.stringify({ kind: 'dr-image-manifest', images: [] })], { type: 'application/json' });
+    const { id } = await DR.platform.assets.upload(blob, { type: 'application/json' });
+    return (await fetch(DR.imgUrl(id))).json();
+  });
+  expect(back).toEqual({ kind: 'dr-image-manifest', images: [] });
 });

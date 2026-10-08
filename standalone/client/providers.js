@@ -49,11 +49,11 @@ const profileOf = name => profiles.find(p => p.name === name);
 export const profileNames = () => profiles.map(p => p.name);
 export const activeProfile = () => active;
 // a profile's settings, or the defaults for a new one
-export const profileConfig = (name = active) => ({ ...DEFAULTS, ...(profileOf(name) || {}).config });
+export const profileConfig = name => ({ ...DEFAULTS, ...(profileOf(name) || {}).config });
 export const providerConfig = () => profileConfig(active);
 export const profileHasKey = name => !!(profileOf(name) || {}).hasKey;
 async function take(path, body) {
-  const view = await (await post(path, body)).json();
+  const view = await post(path, body);
   profiles = view.profiles;
   active = view.active;
   blocked = null;
@@ -75,6 +75,7 @@ const BLOCKING = new Set(['not_granted', 'insufficient_credit']);
 const TEXT = {
   not_configured: N_('Choose an AI provider and model in Settings to start playing.'),
   no_server: N_('Start the app with npm start, then reload this page.'),
+  no_profile: N_('That profile is gone. Choose another in Settings.'),
   invalid_config: N_('Check the endpoint, model and limits in Settings.'),
   not_granted: N_('Authentication failed. Check your API key and access to this model.'),
   insufficient_credit: N_('The API account has insufficient credit or quota.'),
@@ -90,8 +91,8 @@ const TEXT = {
   refused: N_('The provider refused this request.'),
   cancelled: N_('Cancelled'),
 };
-function failure(code, fallbackMessage) {
-  const e = Object.assign(new Error(TEXT[code] ? tr(TEXT[code]) : fallbackMessage || tr('Request failed.')), {
+function failure(code) {
+  const e = Object.assign(new Error(tr(TEXT[code] || N_('Request failed.'))), {
     code: PASS.has(code) ? code : 'sampling_disabled',
   });
   if (BLOCKING.has(code)) blocked = e;
@@ -125,8 +126,8 @@ async function imagePart(blob) {
 
 // one streamed request to the relay, resolving to the text, the model that answered and the token usage
 async function relay(body, signal, onText) {
-  const response = await post('/api/sample', body, { signal }).catch(e => {
-    throw signal.aborted ? e : failure(e.code, e.message);
+  const response = await post('/api/sample', body, { signal, raw: true }).catch(e => {
+    throw signal.aborted ? e : failure(e.code);
   });
   let text = '',
     result = null;
@@ -174,7 +175,7 @@ export async function sample(prompt, opts = {}) {
   };
   try {
     const image = opts.images ? await imagePart(opts.images) : undefined;
-    const result = await relay({ prompt, image, json: !!opts.json, quick }, controller.signal, onText);
+    const result = await relay({ prompt, image, json: !!opts.json, quick, profile: active }, controller.signal, onText);
     providerUsage.calls++;
     providerUsage.input += (result.usage && result.usage.input) || 0;
     providerUsage.output += (result.usage && result.usage.output) || 0;
@@ -195,5 +196,5 @@ export async function sample(prompt, opts = {}) {
 sample.json = async (prompt, opts = {}) => parseJson((await sample(prompt, { ...opts, json: true })).text);
 sample.limits = async () => {
   const c = providerConfig();
-  return { maxPromptBytes: c.promptBytes, images: !!c.vision };
+  return { maxPromptBytes: Math.min(c.promptBytes, 2000000), images: !!c.vision }; // the relay's ceiling
 };

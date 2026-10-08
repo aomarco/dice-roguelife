@@ -57,10 +57,12 @@
   "Data folder (saves, images, AI connection)": "データフォルダー（セーブ、画像、AI 接続）",
   "Names for other devices, one per line (Tailscale)": "他の端末から接続する名前、1行に1つ（Tailscale）",
   "Save server settings": "サーバー設定を保存",
-  "Now: {path}": "現在：{path}",
   "To play on your phone, run tailscale serve --bg {port} on this computer and add the name it prints here.": "スマホで遊ぶには、このコンピューターで tailscale serve --bg {port} を実行し、表示された名前をここに入力してください。",
   "Saved. Restart npm start to use the new port or data folder.": "保存しました。新しいポートやデータフォルダーは、npm start を起動し直すと反映されます。",
   "Saved.": "保存しました。",
   "Check the port (1 to 65535), the data folder and the names.": "ポート（1〜65535）、データフォルダー、名前を確認してください。",
-  "Advanced": "詳細設定"
+  "Advanced": "詳細設定",
+  "That profile is gone. Choose another in Settings.": "そのプロファイルはもうありません。設定で別のプロファイルを選んでください。",
+  "This is too large to store.": "大きすぎて保存できません。",
+  "Now: port {port}, {path}": "現在：ポート {port}、{path}"
 }

@@ -2,31 +2,36 @@
 // the AI connection on disk (store.js) and relays narration requests to the chosen provider (relay.js). See README.md.
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { createReadStream, existsSync, readFileSync, statfsSync } from 'node:fs';
+import { createReadStream, readFileSync, statfsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { build } from '../tools/build.js';
 import { apiError, relaySample } from './relay.js';
-import { openStore, writeAtomic } from './store.js';
+import { openStore, readJsonFile, writeAtomic } from './store.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
+const CONFIG = join(HERE, 'config.json');
 const MAX_JSON = 32_000_000; // a save page or an image analysis request
 const MAX_ASSET = 25_000_000;
 const IDLE = 300_000; // a provider silent this long is given up on (a slow local model still streams)
+const HOST_NAME = /^[a-z0-9-]+(\.[a-z0-9-]+)*$/i;
 
-const CONFIG = join(HERE, 'config.json');
-const readConfig = file => (existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {});
-// standalone/config.json, all optional: port, dataDir (relative to standalone/) and hosts (see README.md); ⚙ Settings
-// edits it too
-export function loadConfig(file = CONFIG) {
-  const c = readConfig(file);
-  const out = {};
-  if (c.port) out.port = c.port;
-  if (c.dataDir) out.dataDir = resolve(HERE, c.dataDir);
-  if (c.hosts) out.extraHosts = c.hosts;
-  return out;
+// standalone/config.json, written by hand or from ⚙ Settings → Server settings; every field is optional
+export function checkConfig(c) {
+  const ok =
+    c &&
+    typeof c === 'object' &&
+    (c.port === undefined || (Number.isInteger(c.port) && c.port >= 1 && c.port <= 65535)) &&
+    (c.dataDir === undefined || (typeof c.dataDir === 'string' && c.dataDir.trim() !== '')) &&
+    (c.hosts === undefined ||
+      (Array.isArray(c.hosts) && c.hosts.length <= 10 && c.hosts.every(h => HOST_NAME.test(h))));
+  if (!ok) throw apiError('bad_settings', 'config.json: port is 1 to 65535, dataDir a folder, hosts a list of names.');
+  if (c.hosts) c.hosts = c.hosts.map(h => h.toLowerCase()); // browsers send host names in lower case
+  return c;
 }
+// a profile by name, never something every object has (a profile named "constructor" or "toString")
+const profileOf = (c, name) => (Object.hasOwn(c.profiles, name) ? c.profiles[name] : undefined);
 
 async function readBody(req, max, code = 'too_large') {
   const chunks = [];
@@ -38,27 +43,22 @@ async function readBody(req, max, code = 'too_large') {
   }
   return Buffer.concat(chunks);
 }
-// what the page may see of the AI connection profiles: everything but the keys
-const profilesView = c => ({
-  active: c.active,
-  profiles: Object.entries(c.profiles).map(([name, p]) => ({ name, config: p.config, hasKey: !!p.apiKey })),
-});
 const readJson = async (req, max = MAX_JSON, code) => JSON.parse(await readBody(req, max, code));
 const sendJson = (res, status, value) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(value));
 };
+// what the page may see of the AI connection profiles: everything but the keys
+const profilesView = c => ({
+  active: c.active,
+  profiles: Object.entries(c.profiles).map(([name, p]) => ({ name, config: p.config, hasKey: !!p.apiKey })),
+});
 
-// Options default to config.json. extraHosts: names other devices reach this server by through a proxy on this
-// computer (e.g. `tailscale serve`).
-export async function startServer(options = {}) {
-  const configFile = options.configFile || CONFIG;
-  let {
-    port = 3000,
-    dataDir = join(HERE, 'data'),
-    extraHosts = [],
-    fetcher = fetch,
-  } = { ...loadConfig(configFile), ...options };
+// Options (port, dataDir, hosts) default to config.json; tests also pass configFile and fetcher.
+export async function startServer({ configFile = CONFIG, fetcher = fetch, ...options } = {}) {
+  const config = { ...checkConfig(readJsonFile(configFile, {})), ...options };
+  const dataDir = resolve(HERE, config.dataDir || 'data');
+  let names = config.hosts || []; // other names this server answers to, through a proxy here (e.g. `tailscale serve`)
   const token = randomBytes(32).toString('hex');
   const store = openStore(dataDir);
   const { html } = await build(undefined, {
@@ -66,11 +66,16 @@ export async function startServer(options = {}) {
     css: readFileSync(join(HERE, 'client', 'standalone.css'), 'utf8'),
   });
   const page = html.replace('<script>', `<script>window.DR_SERVER_TOKEN=${JSON.stringify(token)};`);
-  let hosts, origins, cookieName; // set once listening, when the port is known
-  const allow = names => {
-    extraHosts = names;
-    hosts = [`127.0.0.1:${port}`, `localhost:${port}`, ...names];
-    origins = [`http://127.0.0.1:${port}`, `http://localhost:${port}`, ...names.map(h => 'https://' + h)];
+  const port = () => server.address().port;
+  // this computer's own names, with the port, and without it on 80 (browsers leave a default port out)
+  const local = () => ['127.0.0.1', 'localhost'].flatMap(h => (port() === 80 ? [h, `${h}:80`] : [`${h}:${port()}`]));
+  const cookieName = () => `dr_token_${port()}`; // cookies aren't kept apart by port
+  // reads the profiles, lets edit change them, saves them and returns what the page may see
+  const editConnection = edit => {
+    const c = store.connection.get();
+    edit(c);
+    store.connection.set(c);
+    return profilesView(c);
   };
 
   const routes = {
@@ -93,58 +98,55 @@ export async function startServer(options = {}) {
     '/api/connection/get': async () => profilesView(store.connection.get()),
     '/api/connection/use': async req => {
       const { name } = await readJson(req, 1000);
-      const c = store.connection.get();
-      if (!c.profiles[name]) throw apiError('invalid_config', 'No such profile.');
-      store.connection.set({ ...c, active: name });
-      return profilesView({ ...c, active: name });
+      return editConnection(c => {
+        if (!profileOf(c, name)) throw apiError('no_profile', 'No such profile.');
+        c.active = name;
+      });
     },
     '/api/connection/delete': async req => {
       const { name } = await readJson(req, 1000);
-      const c = store.connection.get();
-      delete c.profiles[name];
-      if (c.active === name) c.active = Object.keys(c.profiles)[0] || '';
-      store.connection.set(c);
-      return profilesView(c);
+      return editConnection(c => {
+        delete c.profiles[name];
+        if (c.active === name) c.active = Object.keys(c.profiles)[0] || '';
+      });
     },
-    // ⚙ Settings → Server: the port and data folder apply at the next start, the names at once
-    '/api/server/get': async () => ({
-      port,
-      dataDir: readConfig(configFile).dataDir || 'data',
-      dataPath: dataDir,
-      hosts: extraHosts,
-    }),
-    '/api/server/set': async req => {
-      const next = await readJson(req, 10_000);
-      const okHost = h => typeof h === 'string' && /^[a-z0-9-]+(\.[a-z0-9-]+)*$/i.test(h);
-      if (!Number.isInteger(next.port) || next.port < 1 || next.port > 65535) throw apiError('invalid_config', 'Port');
-      if (!Array.isArray(next.hosts) || next.hosts.length > 10 || !next.hosts.every(okHost))
-        throw apiError('invalid_config', 'Hosts');
-      if (typeof next.dataDir !== 'string' || !next.dataDir.trim()) throw apiError('invalid_config', 'Data folder');
-      const saved = { ...readConfig(configFile), port: next.port, dataDir: next.dataDir.trim(), hosts: next.hosts };
-      writeAtomic(configFile, JSON.stringify(saved, null, 2) + '\n');
-      allow(next.hosts);
-      return { restart: next.port !== port || resolve(HERE, saved.dataDir) !== resolve(dataDir) };
-    },
-    // saves a profile (previous: the one it was, for a rename; none for a new one) and makes it the one in use.
+    // Saves a profile (previous: the one it was, for a rename; none for a new one) and makes it the one in use.
     // A blank key keeps the profile's own, unless the endpoint changed.
     '/api/connection/set': async req => {
       const { name: raw, previous, config, apiKey } = await readJson(req, 100_000);
       const name = String(raw || '').trim();
-      if (!name || name.length > 40) throw apiError('invalid_config', 'Profile name');
-      const c = store.connection.get();
-      if (name !== previous && c.profiles[name]) throw apiError('name_taken', 'That profile name is taken.');
-      const old = c.profiles[previous] || { config: {}, apiKey: '' };
-      const key = apiKey ? String(apiKey).trim() : config.endpoint === old.config.endpoint ? old.apiKey : '';
-      if (previous && previous !== name) delete c.profiles[previous];
-      c.profiles[name] = { config, apiKey: key };
-      c.active = name;
-      store.connection.set(c);
-      return profilesView(c);
+      if (!name || name.length > 40 || name === '__proto__') throw apiError('bad_name', 'Profile name.');
+      return editConnection(c => {
+        if (name !== previous && profileOf(c, name)) throw apiError('name_taken', 'That profile name is taken.');
+        const old = profileOf(c, previous) || { config: {}, apiKey: '' };
+        const key = apiKey ? String(apiKey).trim() : config.endpoint === old.config.endpoint ? old.apiKey : '';
+        if (previous && previous !== name) delete c.profiles[previous];
+        c.profiles[name] = { config, apiKey: key };
+        c.active = name;
+      });
+    },
+    // ⚙ Settings → Server settings: what config.json says, and what this run uses (port and folder change at the next
+    // start, names at once)
+    '/api/server/get': async () => {
+      const saved = readJsonFile(configFile, {});
+      return {
+        port: saved.port ?? 3000,
+        dataDir: saved.dataDir || 'data',
+        hosts: saved.hosts || [],
+        running: { port: port(), dataPath: dataDir },
+      };
+    },
+    '/api/server/set': async req => {
+      const next = checkConfig(await readJson(req, 10_000));
+      writeAtomic(configFile, JSON.stringify({ ...readJsonFile(configFile, {}), ...next }, null, 2) + '\n');
+      names = next.hosts || [];
+      return { restart: (next.port ?? 3000) !== port() || resolve(HERE, next.dataDir || 'data') !== dataDir };
     },
   };
 
   async function handle(req, res) {
-    if (!hosts.includes(req.headers.host)) return res.writeHead(403).end();
+    const host = String(req.headers.host || '').toLowerCase();
+    if (!local().includes(host) && !names.includes(host)) return res.writeHead(403).end();
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
     const url = new URL(req.url, 'http://localhost');
@@ -152,14 +154,14 @@ export async function startServer(options = {}) {
       res.writeHead(200, {
         'Content-Type': 'text/html; charset=utf-8',
         'Cache-Control': 'no-store',
-        'Set-Cookie': `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict`,
+        'Set-Cookie': `${cookieName()}=${token}; Path=/; HttpOnly; SameSite=Strict`,
       });
       return res.end(page);
     }
     // Pictures load through <img>, which can't send a header: the page's cookie admits them. An id is never reused,
     // so the browser may keep each one, and the sandbox keeps an uploaded SVG or page from running as this site.
     if (req.method === 'GET' && url.pathname.startsWith('/assets/')) {
-      if (!String(req.headers.cookie || '').includes(`${cookieName}=${token}`)) return res.writeHead(403).end();
+      if (!String(req.headers.cookie || '').includes(`${cookieName()}=${token}`)) return res.writeHead(403).end();
       const asset = store.assets.get(url.pathname.slice('/assets/'.length));
       if (!asset) return res.writeHead(404).end();
       res.writeHead(200, {
@@ -171,15 +173,17 @@ export async function startServer(options = {}) {
     }
     const route = req.method === 'POST' && (url.pathname === '/api/sample' ? 'sample' : routes[url.pathname]);
     if (!route) return res.writeHead(404).end();
-    if (req.headers['x-dr-token'] !== token || (req.headers.origin && !origins.includes(req.headers.origin)))
-      return res.writeHead(403).end();
+    const origin = req.headers.origin;
+    const fromHere = local().some(h => origin === 'http://' + h) || names.some(n => origin === 'https://' + n);
+    if (req.headers['x-dr-token'] !== token || (origin && !fromHere)) return res.writeHead(403).end();
     res.setHeader('Cache-Control', 'no-store');
     if (route === 'sample') return relay(req, res, store, fetcher);
     try {
       sendJson(res, 200, await route(req));
     } catch (e) {
+      // only a code goes back; the page words it (client/net.js)
       if (!e.code) console.error(e);
-      sendJson(res, 400, { code: e.code || 'storage_error', message: e.code ? e.message : 'Request failed.' });
+      sendJson(res, 400, { code: e.code || 'storage_error' });
     }
   }
   const server = createServer((req, res) =>
@@ -192,15 +196,12 @@ export async function startServer(options = {}) {
   server.on('close', () => store.close());
   await new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(port, '127.0.0.1', resolve);
+    server.listen(config.port ?? 3000, '127.0.0.1', resolve);
   });
-  port = server.address().port;
-  allow(extraHosts);
-  cookieName = `dr_token_${port}`; // cookies aren't kept apart by port
   return server;
 }
 
-// one narration request: the page sends the prompt, the server adds the stored connection and key
+// one narration request: the page sends the prompt and its profile, the server adds that profile's settings and key
 async function relay(req, res, store, fetcher) {
   const controller = new AbortController();
   let timer;
@@ -213,9 +214,11 @@ async function relay(req, res, store, fetcher) {
     if (!res.writableEnded) controller.abort();
   });
   try {
-    const { prompt, image, json, quick } = await readJson(req, MAX_JSON, 'prompt_too_large');
+    const { prompt, image, json, quick, profile } = await readJson(req, MAX_JSON, 'prompt_too_large');
     const c = store.connection.get();
-    const { config, apiKey } = c.profiles[c.active] || { config: {} };
+    const chosen = profileOf(c, profile || c.active);
+    if (!chosen) throw apiError(profile ? 'no_profile' : 'not_configured', 'No such profile.');
+    const { config, apiKey } = chosen;
     if (!config.model) throw apiError('not_configured', 'No model chosen.');
     const model = quick && config.summaryModel ? config.summaryModel : config.model;
     const emit = event => {

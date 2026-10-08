@@ -4,10 +4,10 @@
 import { registerHost } from '../../src/js/host.js';
 import { clone, uid } from '../../src/js/util.js';
 import { post } from './net.js';
-import { loadConnection, providerConfig, sample } from './providers.js';
-import { bindProviderSettings, showSetupBanner } from './settings.js';
+import { loadConnection, sample } from './providers.js';
+import { bindProviderSettings, syncBanner } from './settings.js';
 
-const dbCall = async body => (await post('/api/db', body)).json();
+const dbCall = body => post('/api/db', body);
 
 // documents: the same shapes as memDB (src/js/db.js)
 const snap = (id, exists, value) => ({ id, exists, data: () => (exists ? clone(value) : undefined) });
@@ -39,10 +39,10 @@ function collection(path, where = [], order = null, limit = 1000) {
 }
 
 const assets = {
-  upload: async (blob, { type } = {}) => (await post('/api/assets/upload', blob, { type: type || blob.type })).json(),
+  upload: (blob, { type } = {}) => post('/api/assets/upload', blob, { type: type || blob.type }),
   // the disk's free space is the byte limit
   list: async () => {
-    const { files, free } = await (await post('/api/assets/list', {})).json();
+    const { files, free } = await post('/api/assets/list', {});
     const bytes = files.reduce((n, f) => n + f.size, 0);
     return { assets: files, usage: { bytes, files: files.length, maxFiles: 50000, maxBytes: bytes + free } };
   },
@@ -75,7 +75,7 @@ registerHost({
     if (capability === 'user') return { id: async () => 'local', isOwner: async () => true, can: async () => true };
     if (capability === 'sample') {
       await loadConnection();
-      if (!providerConfig().model) showSetupBanner();
+      syncBanner();
       return sample;
     }
     return null;

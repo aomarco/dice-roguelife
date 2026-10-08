@@ -26,9 +26,18 @@ function bindable(v) {
 const metaOf = data =>
   JSON.stringify(Object.fromEntries(Object.entries(data).filter(([, v]) => typeof v !== 'object')));
 // writes a file whole or not at all
-export function writeAtomic(path, bytes) {
-  writeFileSync(path + '.tmp', bytes);
+export function writeAtomic(path, bytes, mode) {
+  writeFileSync(path + '.tmp', bytes, { mode });
   renameSync(path + '.tmp', path);
+}
+// a JSON file, or fallback when there is none; a damaged one throws rather than being replaced by the fallback
+export function readJsonFile(path, fallback) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (e) {
+    if (e.code === 'ENOENT') return fallback;
+    throw e;
+  }
 }
 
 export function openStore(dir) {
@@ -92,28 +101,26 @@ export function openStore(dir) {
     }
   }
 
+  const addAsset = db.prepare('INSERT INTO assets (id, type, size, created) VALUES (?, ?, ?, ?)');
+  const getAsset = db.prepare('SELECT type FROM assets WHERE id = ?');
+  const listAssets = db.prepare('SELECT id, type AS contentType, size, created AS createdAt FROM assets');
+  const delAsset = db.prepare('DELETE FROM assets WHERE id = ?');
   const assets = {
     add(bytes, type) {
       const id = randomUUID();
       writeAtomic(join(files, id), bytes);
-      db.prepare('INSERT INTO assets (id, type, size, created) VALUES (?, ?, ?, ?)').run(
-        id,
-        type,
-        bytes.length,
-        new Date().toISOString(),
-      );
+      addAsset.run(id, type, bytes.length, new Date().toISOString());
       return id;
     },
     // { type, file } or null
     get(id) {
-      if (!ID.test(id)) return null;
-      const row = db.prepare('SELECT type FROM assets WHERE id = ?').get(id);
+      const row = ID.test(id) && getAsset.get(id);
       return row ? { type: row.type, file: join(files, id) } : null;
     },
-    list: () => db.prepare('SELECT id, type AS contentType, size, created AS createdAt FROM assets').all(),
+    list: () => listAssets.all(),
     delete(id) {
       if (!ID.test(id)) return;
-      db.prepare('DELETE FROM assets WHERE id = ?').run(id);
+      delAsset.run(id);
       rmSync(join(files, id), { force: true });
     },
   };
@@ -121,14 +128,8 @@ export function openStore(dir) {
   // the AI connection profiles: { active, profiles: { name: { config, apiKey } } }, kept apart from the game's documents
   // so saves and exports never hold a key
   const connection = {
-    get() {
-      try {
-        return JSON.parse(readFileSync(connectionFile, 'utf8'));
-      } catch {
-        return { active: '', profiles: {} };
-      }
-    },
-    set: value => writeAtomic(connectionFile, JSON.stringify(value, null, 2)),
+    get: () => readJsonFile(connectionFile, { active: '', profiles: {} }),
+    set: value => writeAtomic(connectionFile, JSON.stringify(value, null, 2), 0o600), // only this user may read the keys
   };
 
   return { docOp, assets, connection, close: () => db.close() };

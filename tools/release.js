@@ -26,7 +26,17 @@ const RELEASED = join(ROOT, 'tools', '.released_prompt.json');
 const MARK = 'tools/.released_prompt.json'; // its path inside the package
 const LINTED = ['src/js', 'tools', 'tests', 'standalone']; // what ESLint and the comment scan read
 const FORMATTED = ['src', 'tools', 'tests', 'standalone', 'eslint.config.js', 'playwright.config.js']; // what Prettier keeps in shape
-const NOT_PACKAGED = new Set(['.git', 'node_modules', 'dist', 'data', 'shots', 'test-results', 'playwright-report']); // data: local image libraries, never shipped
+// data: local image libraries, never shipped; worktrees: other checkouts (.claude/worktrees)
+const NOT_PACKAGED = new Set([
+  '.git',
+  'node_modules',
+  'dist',
+  'data',
+  'shots',
+  'test-results',
+  'playwright-report',
+  'worktrees',
+]);
 const USAGE = 'usage: node tools/release.js <x.y.z> [--fast] | --check | --mark-prompt';
 
 const at = (...parts) => join(ROOT, ...parts);
@@ -131,9 +141,13 @@ function makePackage(ver) {
   const walk = dir => {
     for (const e of readdirSync(dir, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
       const full = join(dir, e.name);
+      // by name first: node_modules may be a link (a worktree sharing another checkout's)
+      if (NOT_PACKAGED.has(e.name) || e.isSymbolicLink()) continue;
       if (e.isDirectory()) {
-        if (!NOT_PACKAGED.has(e.name)) walk(full);
-      } else if (!/\.(png|zip)$/.test(e.name)) files[rel(full)] = readFileSync(full);
+        // a standalone data folder, whatever it's called, holds saves and API keys
+        if (!existsSync(join(full, 'dice-roguelife.db'))) walk(full);
+      } else if (!/\.(png|zip)$/.test(e.name) && rel(full) !== 'standalone/config.json')
+        files[rel(full)] = readFileSync(full);
     }
   };
   walk(ROOT);

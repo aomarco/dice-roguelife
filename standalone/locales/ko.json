@@ -57,10 +57,12 @@
   "Data folder (saves, images, AI connection)": "데이터 폴더 (저장, 이미지, AI 연결)",
   "Names for other devices, one per line (Tailscale)": "다른 기기에서 접속할 이름, 한 줄에 하나 (Tailscale)",
   "Save server settings": "서버 설정 저장",
-  "Now: {path}": "현재: {path}",
   "To play on your phone, run tailscale serve --bg {port} on this computer and add the name it prints here.": "폰에서 하려면 이 컴퓨터에서 tailscale serve --bg {port}를 실행하고, 나오는 이름을 여기에 적으세요.",
   "Saved. Restart npm start to use the new port or data folder.": "저장했어요. 새 포트나 데이터 폴더는 npm start를 다시 실행하면 적용돼요.",
   "Saved.": "저장했어요.",
   "Check the port (1 to 65535), the data folder and the names.": "포트(1~65535), 데이터 폴더, 이름을 확인하세요.",
-  "Advanced": "고급 설정"
+  "Advanced": "고급 설정",
+  "That profile is gone. Choose another in Settings.": "그 프로필이 없어졌어요. 설정에서 다른 프로필을 고르세요.",
+  "This is too large to store.": "너무 커서 저장할 수 없어요.",
+  "Now: port {port}, {path}": "현재: 포트 {port}, {path}"
 }

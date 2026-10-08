@@ -1,2 +1,4 @@
 tests/fixtures/
+standalone/data/
+standalone/config.json
 tools/.released_prompt.json

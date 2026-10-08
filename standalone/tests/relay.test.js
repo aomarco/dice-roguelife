@@ -1,8 +1,7 @@
 import { test } from 'node:test';
-import { request as httpRequest } from 'node:http';
 import assert from 'node:assert/strict';
 import { providerRequest, normalizeEvent, readSSE, relaySample, httpError } from '../relay.js';
-import { openServer } from './support.js';
+import { hostStatus, openServer } from './support.js';
 
 const input = (protocol = 'compatible', extra = {}) => ({
   config: { protocol, endpoint: 'https://example.com/v1', model: 'test-model', maxTokens: 512, ...extra },
@@ -162,23 +161,13 @@ test('cancellation reaches upstream fetch', async () => {
   c.abort();
   await assert.rejects(promise, { name: 'AbortError' });
 });
-const hostStatus = (url, host) =>
-  new Promise((resolve, reject) => {
-    const req = httpRequest(url, { headers: { Host: host } }, res => {
-      res.resume();
-      resolve(res.statusCode);
-    });
-    req.on('error', reject);
-    req.end();
-  });
-
 test('local relay rejects missing token, foreign origins and rebinding hosts', async () => {
-  const s = await openServer({ extraHosts: ['my-pc.tailnet.ts.net'] });
+  const s = await openServer({ hosts: ['my-pc.tailnet.ts.net'] });
   try {
     assert.equal((await fetch(s.url + '/api/sample', { method: 'POST', body: '{}' })).status, 403);
     assert.equal((await s.call('/api/sample', '{}', { Origin: 'https://attacker.example' })).status, 403);
     assert.equal(await hostStatus(s.url, 'attacker.example'), 403);
-    // a name given in DR_HOSTS (a Tailscale address) is let in, from its own https origin
+    // a name in hosts (a Tailscale address) is let in, from its own https origin
     assert.equal(await hostStatus(s.url, 'my-pc.tailnet.ts.net'), 200);
     assert.equal((await s.call('/api/sample', '{}', { Origin: 'https://my-pc.tailnet.ts.net' })).status, 400);
     assert.deepEqual(await (await s.call('/api/sample', '{}')).json(), { code: 'not_configured' });

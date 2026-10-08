@@ -1,12 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { request } from 'node:http';
+import { rmSync, writeFileSync } from 'node:fs';
 import { connect } from 'node:net';
-import { basename, join } from 'node:path';
-import { loadConfig } from '../server.js';
+import { join } from 'node:path';
+import { checkConfig } from '../server.js';
 import { openStore } from '../store.js';
-import { openServer, tempDir } from './support.js';
+import { hostStatus, openServer, tempDir } from './support.js';
 
 function withStore(run) {
   const dir = tempDir();
@@ -54,7 +53,7 @@ test('the server keeps saves and images across restarts, and images need the pag
   let s = await openServer();
   const { dataDir } = s;
   try {
-    await s.call('/api/db', JSON.stringify({ op: 'set', path: 'data/users/local/saves/items/a', data: { n: 1 } }));
+    await s.call('/api/db', { op: 'set', path: 'data/users/local/saves/items/a', data: { n: 1 } });
     const png = new Uint8Array([137, 80, 78, 71]);
     const { id } = await (await s.call('/api/assets/upload', png, { 'Content-Type': 'image/png' })).json();
     assert.equal((await fetch(`${s.url}/assets/${id}`)).status, 403);
@@ -62,9 +61,7 @@ test('the server keeps saves and images across restarts, and images need the pag
     await s.stop({ keep: true });
 
     s = await openServer({ dataDir });
-    const got = await (
-      await s.call('/api/db', JSON.stringify({ op: 'get', path: 'data/users/local/saves/items/a' }))
-    ).json();
+    const got = await (await s.call('/api/db', { op: 'get', path: 'data/users/local/saves/items/a' })).json();
     assert.deepEqual(got, { exists: true, data: { n: 1 } });
     const img = await fetch(`${s.url}/assets/${id}`, { headers: { Cookie: s.cookie } });
     assert.equal(img.headers.get('content-type'), 'image/png');
@@ -74,7 +71,7 @@ test('the server keeps saves and images across restarts, and images need the pag
       list.files.map(f => [f.id, f.contentType, f.size]),
       [[id, 'image/png', 4]],
     );
-    await s.call('/api/assets/delete', JSON.stringify({ id }));
+    await s.call('/api/assets/delete', { id });
     assert.equal((await fetch(`${s.url}/assets/${id}`, { headers: { Cookie: s.cookie } })).status, 404);
   } finally {
     await s.stop();
@@ -84,10 +81,9 @@ test('the server keeps saves and images across restarts, and images need the pag
 test('connection profiles: keys stay on the server, kept per profile, renamed, switched and deleted', async () => {
   const s = await openServer();
   const call = async (path, body) => {
-    const r = await s.call(path, JSON.stringify(body));
+    const r = await s.call(path, body);
     return r.ok ? r.json() : { status: r.status, ...(await r.json()) };
   };
-  const stored = () => JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8'));
   const paid = { endpoint: 'https://a.example/v1', model: 'm' };
   const local = { endpoint: 'http://localhost:11434/v1', model: 'llama' };
   try {
@@ -115,7 +111,7 @@ test('connection profiles: keys stay on the server, kept per profile, renamed, s
         ['Work', true],
       ],
     );
-    assert.equal(stored().profiles.Work.apiKey, 'secret-1');
+    assert.equal(s.readJson('connection.json').profiles.Work.apiKey, 'secret-1');
     assert.equal(JSON.stringify(await call('/api/connection/get', {})).includes('secret-1'), false);
     // another endpoint without a new key drops the old one
     v = await call('/api/connection/set', {
@@ -157,16 +153,13 @@ test('bad requests never stop the server; image lists are kept; stored files run
   }
 });
 
-test('config.json: port, data folder (relative to standalone/) and extra host names', () => {
+test('config.json: checked at start, so a bad file stops the server with a clear message', async () => {
   const dir = tempDir();
   try {
-    const file = join(dir, 'config.json');
-    writeFileSync(file, JSON.stringify({ port: 3100, dataDir: 'my-data', hosts: ['my-pc.tail1234.ts.net'] }));
-    const c = loadConfig(file);
-    assert.equal(c.port, 3100);
-    assert.equal(basename(c.dataDir), 'my-data');
-    assert.deepEqual(c.extraHosts, ['my-pc.tail1234.ts.net']);
-    assert.deepEqual(loadConfig(join(dir, 'missing.json')), {});
+    writeFileSync(join(dir, 'config.json'), JSON.stringify({ hosts: 'my-pc' }));
+    await assert.rejects(openServer({ dataDir: dir }), { code: 'bad_settings' });
+    assert.throws(() => checkConfig({ port: 70000 }), { code: 'bad_settings' });
+    assert.deepEqual(checkConfig({ port: 3100, dataDir: 'my-data', hosts: ['my-pc.tail1234.ts.net'] }).port, 3100);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -174,27 +167,37 @@ test('config.json: port, data folder (relative to standalone/) and extra host na
 
 test('server settings from ⚙: written to config.json, names allowed at once, port and folder after a restart', async () => {
   const s = await openServer();
-  const set = body => s.call('/api/server/set', JSON.stringify(body));
   const port = Number(new URL(s.url).port);
   try {
-    const now = await (await s.call('/api/server/get', '{}')).json();
-    assert.deepEqual([now.port, now.dataDir, now.hosts], [port, 'data', []]);
-    const r = await (await set({ port, dataDir: 'data', hosts: ['my-pc.tail1234.ts.net'] })).json();
+    const now = await (await s.call('/api/server/get', {})).json();
+    assert.deepEqual(now, { port: 3000, dataDir: 'data', hosts: [], running: { port, dataPath: s.dataDir } });
+    const r = await (
+      await s.call('/api/server/set', { port, dataDir: 'data', hosts: ['my-pc.tail1234.ts.net'] })
+    ).json();
     assert.deepEqual(r, { restart: true }); // the test server's data folder isn't standalone/data
-    const file = JSON.parse(readFileSync(join(s.dataDir, 'config.json'), 'utf8'));
-    assert.deepEqual(file, { port, dataDir: 'data', hosts: ['my-pc.tail1234.ts.net'] });
-    const status = await new Promise((resolve, reject) => {
-      const req = request(s.url, { headers: { Host: 'my-pc.tail1234.ts.net' } }, res => {
-        res.resume();
-        resolve(res.statusCode);
-      });
-      req.on('error', reject);
-      req.end();
-    });
-    assert.equal(status, 200);
-    assert.equal((await set({ port: 0, dataDir: 'data', hosts: [] })).status, 400);
-    assert.equal((await set({ port, dataDir: 'data', hosts: ['bad host/'] })).status, 400);
-    assert.equal((await set({ port, dataDir: '', hosts: [] })).status, 400);
+    assert.deepEqual(s.readJson('config.json'), { port, dataDir: 'data', hosts: ['my-pc.tail1234.ts.net'] });
+    assert.equal(await hostStatus(s.url, 'my-pc.tail1234.ts.net'), 200);
+    for (const bad of [{ port: 0 }, { hosts: ['bad host/'] }, { dataDir: '' }]) {
+      const res = await s.call('/api/server/set', bad);
+      assert.deepEqual([res.status, await res.json()], [400, { code: 'bad_settings' }]);
+    }
+  } finally {
+    await s.stop();
+  }
+});
+
+test('names as people type them: Tailscale names in capitals, profiles named like object properties', async () => {
+  const s = await openServer({ hosts: checkConfig({ hosts: ['DESKTOP-AB12.Tail1234.ts.net'] }).hosts });
+  try {
+    assert.equal(await hostStatus(s.url, 'desktop-ab12.tail1234.ts.net'), 200);
+    const config = { endpoint: 'http://localhost:11434/v1', model: 'llama' };
+    const v = await (await s.call('/api/connection/set', { name: 'constructor', config })).json();
+    assert.deepEqual(
+      v.profiles.map(p => p.name),
+      ['constructor'],
+    );
+    assert.equal((await (await s.call('/api/connection/use', { name: 'toString' })).json()).code, 'no_profile');
+    assert.equal((await (await s.call('/api/connection/set', { name: '__proto__', config })).json()).code, 'bad_name');
   } finally {
     await s.stop();
   }

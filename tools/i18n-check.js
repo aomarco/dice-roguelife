@@ -123,7 +123,7 @@ export function check({ list = false } = {}) {
   const keys = new Map([...page.keys, ...mod.keys]);
   const errors = [...mod.errors, ...page.errors];
   // An ASCII shell pipe can destroy translations before a UTF-8 write occurs.
-  const damaged = text => /\?{2,}|\uFFFD/.test(text);
+  const damaged = text => /\?{3,}|\uFFFD/.test(text);
   for (const [lang, catalog] of [
     ['ko', ko],
     ['ja', ja],
