@@ -1,3 +1,6 @@
+import { setTimeout as sleep } from 'node:timers/promises';
+import { readLines } from './lines.js';
+
 export const apiError = (code, message) => Object.assign(new Error(message), { code });
 export function providerRequest({ config, apiKey = '', prompt, image, json = false }) {
   if (
@@ -134,10 +137,7 @@ export function normalizeEvent(protocol, value, streamed = true) {
 }
 
 export async function readSSE(body, onValue) {
-  const reader = body.getReader(),
-    decoder = new TextDecoder();
-  let buffer = '',
-    data = [];
+  let data = [];
   const line = text => {
     if (!text) {
       if (data.length) {
@@ -147,23 +147,8 @@ export async function readSSE(body, onValue) {
       }
     } else if (text.startsWith('data:')) data.push(text.slice(5).replace(/^ /, ''));
   };
-  try {
-    while (true) {
-      const chunk = await reader.read();
-      buffer += decoder.decode(chunk.value, { stream: !chunk.done });
-      if (buffer.length > 2000000) throw apiError('output_limit', 'A stream event is too large.');
-      let end;
-      while ((end = buffer.indexOf('\n')) >= 0) {
-        line(buffer.slice(0, end).replace(/\r$/, ''));
-        buffer = buffer.slice(end + 1);
-      }
-      if (chunk.done) break;
-    }
-    if (buffer) line(buffer.replace(/\r$/, ''));
-    line('');
-  } finally {
-    await reader.cancel().catch(() => {});
-  }
+  await readLines(body, line);
+  line('');
 }
 
 export function httpError(status, data = '') {
@@ -179,46 +164,27 @@ export function httpError(status, data = '') {
             : 'invalid_request';
   if (/insufficient_quota|insufficient.*(balance|credit)|credit balance/i.test(data)) code = 'insufficient_credit';
   else if (/context_length|context window|too many tokens/i.test(data)) code = 'prompt_too_large';
-  const messages = {
-    not_granted: 'Authentication failed. Check your API key and access to this model.',
-    rate_limited: 'The provider rate limit was reached. Wait before trying again.',
-    insufficient_credit: 'The API account has insufficient credit or quota.',
-    provider_unavailable: 'The provider is temporarily unavailable.',
-    invalid_request: 'The provider rejected this request. Check the endpoint, model, JSON mode and output limit.',
-    prompt_too_large: 'The model context limit was exceeded. Reduce recent memory.',
-  };
-  return apiError(code, `${messages[code]} (HTTP ${status})`);
+  return apiError(code, `HTTP ${status}`);
 }
 
 export async function relaySample(input, emit, signal, fetcher = fetch) {
   const request = providerRequest(input);
   const retries = Math.max(0, Math.min(2, Number(input.config.retries) || 0));
+  const body = JSON.stringify(request.body);
   let response;
   for (let attempt = 0; attempt <= retries; attempt++) {
     response = await fetcher(request.url, {
       method: 'POST',
       headers: request.headers,
-      body: JSON.stringify(request.body),
+      body,
       signal,
       redirect: 'error',
     });
     if (response.ok) break;
     const failure = httpError(response.status, await response.text());
     if (attempt === retries || !['rate_limited', 'provider_unavailable'].includes(failure.code)) throw failure;
-    await new Promise((resolve, reject) => {
-      const abort = () => {
-        clearTimeout(timer);
-        reject(apiError('cancelled', 'Cancelled'));
-      };
-      const timer = setTimeout(
-        () => {
-          signal.removeEventListener('abort', abort);
-          resolve();
-        },
-        Math.min(1000 * 2 ** attempt, 4000),
-      );
-      signal.addEventListener('abort', abort, { once: true });
-      if (signal.aborted) abort();
+    await sleep(Math.min(1000 * 2 ** attempt, 4000), undefined, { signal }).catch(() => {
+      throw apiError('cancelled', 'Cancelled');
     });
   }
   let model = input.config.model,

@@ -20,8 +20,7 @@ npm start
 
 Open **http://localhost:3000**, then **⚙ Settings → AI connection**: choose a provider, paste your API key (not
 needed for local models), enter the provider's exact model ID, and **Save connection**. **Test connection** makes one
-API call. Keep the server running while you play. To use another port: `PORT=3001 npm start` (PowerShell:
-`$env:PORT=3001; npm start`).
+API call. Keep the server running while you play.
 
 ## Providers
 
@@ -43,21 +42,45 @@ API calls are billed to your API account. Like the artifact, the game makes extr
 Reviews, and a reply it can't read is retried up to twice. Network retries for rate limits and server errors are off
 by default (⚙ Settings). The usage line in Settings shows the tokens providers report.
 
-Your key stays in the page's memory and is typed again after a reload, unless you tick **Remember key on this
-device**, which keeps it **unencrypted** in this browser. Keys never go into saves or exports, and the server never
-writes them to disk.
+The connection and your key are kept on this computer in `standalone/data/connection.json`, **unencrypted**, so every
+browser here uses them. The server adds the key when it calls the provider: the page never gets it back, and it never
+goes into saves or exports. Choosing another endpoint without typing a new key drops the old one.
 
 ## Saves and images
 
 Saves, settings and images are kept on disk in `standalone/data/` (a SQLite file and an `assets` folder), not in the
 browser. Clearing browser data doesn't touch them, and any browser on this computer sees the same saves. To back up,
-stop the server and copy the folder. To keep them elsewhere, set `DR_DATA` to a folder path.
+stop the server and copy the folder. To keep them elsewhere, set `dataDir` in `config.json` (below).
 
 Moving from the artifact: export your saves (Saves → Save file) and your images (Images → Export pack) there, then
 import them here. Pictures pinned to past turns don't carry over; portraits for new turns do.
 
-Playing from another device (a phone against this computer) is not supported yet: the server only answers this
-computer.
+## Playing on your phone (Tailscale)
+
+The server only answers this computer. To play from your phone as well, install [Tailscale](https://tailscale.com/) on
+the computer and the phone with the same account, then on the computer run `tailscale serve --bg 3000` (allow HTTPS
+when it asks). It prints this computer's address, such as `https://my-pc.tail1234.ts.net`. Add that name to `hosts` in
+`config.json` (below), start the game again with `npm start`, and open the address on the phone.
+
+Only devices on your Tailscale account can reach it. Don't play the same save on two devices at the same time.
+
+## Server settings (config.json)
+
+The server reads an optional `standalone/config.json` (yours alone: git ignores it). Every field can be left out:
+
+```json
+{
+  "port": 3000,
+  "dataDir": "data",
+  "hosts": ["my-pc.tail1234.ts.net"]
+}
+```
+
+- `port`: the port the game is served on (3000).
+- `dataDir`: where saves, images and the AI connection are kept, relative to `standalone/` (`data`).
+- `hosts`: other names this server answers to, for Tailscale (above).
+
+The AI connection itself is chosen in ⚙ Settings and kept in the data folder (`connection.json`).
 
 ## Updating
 
@@ -68,23 +91,25 @@ Export a backup, stop the server, then `git pull`, `npm ci` and `npm start`. You
 The game reaches its platform only through a host adapter (`src/js/host.js`). This folder adds one more, without
 changing the artifact:
 
-| File                         | Role                                                                                                        |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `server.js`                  | The local server on 127.0.0.1: builds and serves the page, the storage API and the relay                    |
-| `store.js`                   | Documents in SQLite (Node's built-in `node:sqlite`) with memDB's behavior (`src/js/db.js`), images as files |
-| `relay.js`                   | Turns a narration request into each provider's format and streams the reply back                            |
-| `client/main.js`             | The page's entry: registers the host (`registerHost`), then starts the game (`src/js/main.js`)              |
-| `client/host.js`             | The host adapter: db, assets, sample, user and downloads over the local server                              |
-| `client/providers.js`        | Presets, the connection settings and the `sample` capability                                                |
-| `client/settings.js`         | The AI connection panel (the host's `bindSettings`), update steps, the setup banner                         |
-| `client/i18n.js`, `locales/` | The add-on's own Korean and Japanese text (`tr()`), on top of the game's catalogs                           |
-| `client/standalone.css`      | Its styles, added to the standalone page only                                                               |
+| File                         | Role                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `server.js`                  | The local server on 127.0.0.1: builds and serves the page, the storage API and the relay                                       |
+| `store.js`                   | Documents in SQLite (Node's built-in `node:sqlite`) with memDB's behavior (`src/js/db.js`), images as files, the AI connection |
+| `relay.js`                   | Turns a narration request into each provider's format and streams the reply back                                               |
+| `client/main.js`             | The page's entry: the host adapter, then the game (`src/js/main.js`)                                                           |
+| `client/host.js`             | The host adapter, joined with `registerHost`: db, assets, sample, user and downloads over the local server                     |
+| `client/net.js`              | Requests to the local server with its token                                                                                    |
+| `client/providers.js`        | Presets, the page's copy of the connection, and the `sample` capability                                                        |
+| `client/settings.js`         | The AI connection panel (the host's `bindSettings`), update steps, the setup banner                                            |
+| `client/i18n.js`, `locales/` | The add-on's own Korean and Japanese text (`tr()`), on top of the game's catalogs                                              |
+| `client/standalone.css`      | Its styles, added to the standalone page only                                                                                  |
+| `lines.js`                   | Reads a streamed body line by line, for the relay and the page                                                                 |
 
 The artifact build (`npm run build`) contains none of this. The only lines in the game for it are `registerHost` in
 `src/js/host.js` and the optional `bindSettings` call in `src/js/settings-sheet.js`.
 
 The page carries a token made for each server start; storage and relay requests must send it, and pictures need the
-cookie the page sets. The server answers only `localhost` and `127.0.0.1` on its own port.
+cookie the page sets. The server answers only `localhost` and `127.0.0.1` on its own port, and the names in `hosts`.
 
 ## Tests
 

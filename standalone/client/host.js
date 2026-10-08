@@ -1,45 +1,26 @@
-// The host adapter for the standalone page (the contract is in src/js/host.js): saves and images live on the local
-// server (../server.js), narration goes through its relay to the provider chosen in ⚙ Settings.
-import { uid } from '../../src/js/util.js';
-import { tr } from './i18n.js';
-import { createApiSample, providerConfig } from './providers.js';
+// The host adapter for the standalone page (the contract is in src/js/host.js): saves, images and the AI connection
+// live on the local server (../server.js), and narration goes through its relay. It registers itself on load, so
+// main.js imports it before the game.
+import { registerHost } from '../../src/js/host.js';
+import { clone, uid } from '../../src/js/util.js';
+import { post } from './net.js';
+import { loadConnection, providerConfig, sample } from './providers.js';
 import { bindProviderSettings, showSetupBanner } from './settings.js';
 
-async function api(path, body, { raw, type } = {}) {
-  const offline = () =>
-    Object.assign(new Error(tr('Start the app with npm start, then reload this page.')), { code: 'storage_error' });
-  let response;
-  try {
-    response = await fetch(path, {
-      method: 'POST',
-      headers: { 'Content-Type': raw ? type : 'application/json', 'X-DR-Token': window.DR_SERVER_TOKEN },
-      body: raw ? body : JSON.stringify(body),
-    });
-  } catch {
-    throw offline();
-  }
-  // a restarted server has a new token: this page must be reloaded
-  if (response.status === 403) throw offline();
-  const out = await response.json().catch(() => ({}));
-  if (!response.ok)
-    throw Object.assign(new Error(out.message || tr('Request failed.')), { code: out.code || 'storage_error' });
-  return out;
-}
+const dbCall = async body => (await post('/api/db', body)).json();
 
 // documents: the same shapes as memDB (src/js/db.js)
-const snap = (id, exists, value) => ({ id, exists, data: () => (exists ? structuredClone(value) : undefined) });
+const snap = (id, exists, value) => ({ id, exists, data: () => (exists ? clone(value) : undefined) });
 function doc(path) {
   const id = path.split('/').pop();
   return {
-    path,
     id,
     get: async () => {
-      const r = await api('/api/db', { op: 'get', path });
+      const r = await dbCall({ op: 'get', path });
       return snap(id, r.exists, r.data);
     },
-    set: data => api('/api/db', { op: 'set', path, data }),
-    update: data => api('/api/db', { op: 'update', path, data }),
-    delete: () => api('/api/db', { op: 'delete', path }),
+    set: data => dbCall({ op: 'set', path, data }),
+    delete: () => dbCall({ op: 'delete', path }),
   };
 }
 function collection(path, where = [], order = null, limit = 1000) {
@@ -48,28 +29,25 @@ function collection(path, where = [], order = null, limit = 1000) {
     orderBy: (field, dir = 'asc') => collection(path, where, [field, dir], limit),
     limit: n => collection(path, where, order, n),
     doc: id => doc(path + '/' + (id || uid())),
-    add: data => api('/api/db', { op: 'add', path, data }),
+    add: data => dbCall({ op: 'add', path, data }),
     get: async () => {
-      const r = await api('/api/db', { op: 'query', path, where, order, limit });
+      const r = await dbCall({ op: 'query', path, where, order, limit });
       const docs = r.docs.map(d => snap(d.id, true, d.data));
       return { docs, size: docs.length, empty: !docs.length };
     },
   };
 }
-const db = { doc, collection };
 
 const assets = {
-  upload: (blob, { type } = {}) => api('/api/assets/upload', blob, { raw: true, type: type || blob.type }),
-  // the game reads .assets (src/js/library.js, images-view.js); the disk's free space is the byte limit
+  upload: async (blob, { type } = {}) => (await post('/api/assets/upload', blob, { type: type || blob.type })).json(),
+  // the disk's free space is the byte limit
   list: async () => {
-    const { files, free } = await api('/api/assets/list', {});
-    const all = files.map(f => ({ ...f, url: assetUrl(f.id) }));
+    const { files, free } = await (await post('/api/assets/list', {})).json();
     const bytes = files.reduce((n, f) => n + f.size, 0);
-    return { assets: all, files: all, usage: { bytes, files: files.length, maxFiles: 50000, maxBytes: bytes + free } };
+    return { assets: files, usage: { bytes, files: files.length, maxFiles: 50000, maxBytes: bytes + free } };
   },
-  delete: id => api('/api/assets/delete', { id }),
+  delete: id => post('/api/assets/delete', { id }),
 };
-const assetUrl = id => '/assets/' + id;
 
 const downloads = {
   save: async ({ filename, data }) => {
@@ -85,21 +63,21 @@ const downloads = {
   },
 };
 
-const sample = createApiSample();
-export const standaloneHost = {
+registerHost({
   id: 'standalone',
   available: () => !!window.DR_SERVER_TOKEN,
-  assetUrl,
+  assetUrl: id => '/assets/' + id,
   bindSettings: bindProviderSettings,
   connect: async capability => {
-    if (capability === 'db') return db;
+    if (capability === 'db') return { doc, collection };
     if (capability === 'assets') return assets;
     if (capability === 'downloads') return downloads;
     if (capability === 'user') return { id: async () => 'local', isOwner: async () => true, can: async () => true };
     if (capability === 'sample') {
+      await loadConnection();
       if (!providerConfig().model) showSetupBanner();
       return sample;
     }
     return null;
   },
-};
+});

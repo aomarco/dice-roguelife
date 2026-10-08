@@ -229,7 +229,8 @@ npm run release -- 2.5.0   # bump the version, check, test, package
 
 The artifact is the way to play. For people who would rather run the game on their own computer with an API key or a
 local model (Ollama, LM Studio and others), there is a community-maintained add-on in [standalone/](standalone/README.md):
-`npm ci`, then `npm start`. It is not part of the artifact, and the artifact build doesn't include it.
+`npm ci`, then `npm start`. It is not part of the artifact, and the artifact build doesn't include it. To play on
+your phone as well, reach your computer through Tailscale (see that README).
 
 ## License
 

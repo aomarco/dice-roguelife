@@ -1,13 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { connect } from 'node:net';
+import { basename, join } from 'node:path';
+import { loadConfig } from '../server.js';
 import { openStore } from '../store.js';
-import { startServer } from '../server.js';
+import { openServer, tempDir } from './support.js';
 
 function withStore(run) {
-  const dir = mkdtempSync(join(tmpdir(), 'dr-store-'));
+  const dir = tempDir();
   const store = openStore(dir);
   try {
     return run(store, dir);
@@ -17,69 +18,49 @@ function withStore(run) {
   }
 }
 
-test('documents: get, set, update, delete, add, as memDB does', () =>
+test('documents: get, set, delete, add, as memDB does', () =>
   withStore(({ docOp }) => {
-    assert.deepEqual(docOp({ op: 'get', path: 'data/users/local/settings' }), { exists: false, data: undefined });
-    docOp({ op: 'set', path: 'data/users/local/settings', data: { a: 1, b: { c: 2 } } });
-    docOp({ op: 'update', path: 'data/users/local/settings', data: { b: { d: 3 }, e: 'x' } });
-    assert.deepEqual(docOp({ op: 'get', path: 'data/users/local/settings' }).data, { a: 1, b: { d: 3 }, e: 'x' });
+    const path = 'data/users/local/settings';
+    assert.deepEqual(docOp({ op: 'get', path }), { exists: false, data: undefined });
+    docOp({ op: 'set', path, data: { a: 1, b: { c: 2 } } });
+    assert.deepEqual(docOp({ op: 'get', path }).data, { a: 1, b: { c: 2 } });
     const { id } = docOp({ op: 'add', path: 'hall', data: { score: 5 } });
     assert.equal(docOp({ op: 'get', path: 'hall/' + id }).data.score, 5);
     docOp({ op: 'delete', path: 'hall/' + id });
     assert.equal(docOp({ op: 'get', path: 'hall/' + id }).exists, false);
     assert.throws(() => docOp({ op: 'get', path: 'hall' }), { code: 'invalid_path' });
     assert.throws(() => docOp({ op: 'query', path: 'hall/x' }), { code: 'invalid_path' });
-    assert.throws(() => docOp({ op: 'set', path: 'a/../b', data: {} }), { code: 'invalid_path' });
+    assert.throws(() => docOp({ op: 'set', path: 'a/../b/c', data: {} }), { code: 'invalid_path' });
   }));
 
 test('queries: direct children only, where, orderBy and limit', () =>
   withStore(({ docOp }) => {
     const col = 'data/users/local/saves/items/s1/pages';
-    for (const p of [3, 1, 4, 2]) docOp({ op: 'set', path: `${col}/p${p}`, data: { p, first: p * 10 } });
+    for (const p of [3, 1, 4, 2])
+      docOp({ op: 'set', path: `${col}/p${p}`, data: { p, first: p * 10, turns: [{ p }] } });
     docOp({ op: 'set', path: `${col}/p1/deeper/x`, data: { p: 99 } });
-    const ids = r => r.docs.map(d => d.id);
-    assert.deepEqual(ids(docOp({ op: 'query', path: col, order: ['p', 'asc'] })), ['p1', 'p2', 'p3', 'p4']);
-    assert.deepEqual(ids(docOp({ op: 'query', path: col, where: [['p', '>', 1]], order: ['p', 'asc'], limit: 2 })), [
-      'p2',
-      'p3',
-    ]);
-    assert.deepEqual(ids(docOp({ op: 'query', path: col, where: [['first', '<=', 20]], order: ['first', 'desc'] })), [
-      'p2',
-      'p1',
-    ]);
-    assert.deepEqual(ids(docOp({ op: 'query', path: col, where: [['p', '==', 4]] })), ['p4']);
-    assert.throws(() => docOp({ op: 'query', path: col, where: [["p') OR 1=1 --", '>', 0]] }), {
-      code: 'invalid_query',
-    });
-    assert.throws(() => docOp({ op: 'query', path: col, where: [['p', 'in', [1]]] }), { code: 'invalid_query' });
+    const ids = q => docOp({ op: 'query', path: col, ...q }).docs.map(d => d.id);
+    assert.deepEqual(ids({ order: ['p', 'asc'] }), ['p1', 'p2', 'p3', 'p4']);
+    assert.deepEqual(ids({ where: [['p', '>', 1]], order: ['p', 'asc'], limit: 2 }), ['p2', 'p3']);
+    assert.deepEqual(ids({ where: [['first', '<=', 20]], order: ['first', 'desc'] }), ['p2', 'p1']);
+    assert.deepEqual(ids({ where: [['p', '==', 4]] }), ['p4']);
+    assert.deepEqual(docOp({ op: 'query', path: col, where: [['p', '==', 4]] }).docs[0].data.turns, [{ p: 4 }]);
+    assert.throws(() => ids({ where: [["p') OR 1=1 --", '>', 0]] }), { code: 'invalid_query' });
+    assert.throws(() => ids({ where: [['p', 'in', [1]]] }), { code: 'invalid_query' });
   }));
 
 test('the server keeps saves and images across restarts, and images need the page cookie', async () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'dr-server-'));
-  const open = async () => {
-    const server = await startServer({ port: 0, dataDir });
-    const url = `http://127.0.0.1:${server.address().port}`;
-    const res = await fetch(url);
-    const token = /window.DR_SERVER_TOKEN="([a-f0-9]+)"/.exec(await res.text())[1];
-    const cookie = res.headers.get('set-cookie').split(';')[0];
-    const call = (path, body, headers = {}) =>
-      fetch(url + path, { method: 'POST', headers: { 'X-DR-Token': token, ...headers }, body });
-    const stop = async () => {
-      server.closeAllConnections();
-      await new Promise(resolve => server.close(resolve));
-    };
-    return { url, cookie, call, stop };
-  };
+  let s = await openServer();
+  const { dataDir } = s;
   try {
-    let s = await open();
     await s.call('/api/db', JSON.stringify({ op: 'set', path: 'data/users/local/saves/items/a', data: { n: 1 } }));
     const png = new Uint8Array([137, 80, 78, 71]);
     const { id } = await (await s.call('/api/assets/upload', png, { 'Content-Type': 'image/png' })).json();
     assert.equal((await fetch(`${s.url}/assets/${id}`)).status, 403);
     assert.equal((await s.call('/api/db', '{}', { 'X-DR-Token': 'wrong' })).status, 403);
-    await s.stop();
+    await s.stop({ keep: true });
 
-    s = await open();
+    s = await openServer({ dataDir });
     const got = await (
       await s.call('/api/db', JSON.stringify({ op: 'get', path: 'data/users/local/saves/items/a' }))
     ).json();
@@ -94,8 +75,62 @@ test('the server keeps saves and images across restarts, and images need the pag
     );
     await s.call('/api/assets/delete', JSON.stringify({ id }));
     assert.equal((await fetch(`${s.url}/assets/${id}`, { headers: { Cookie: s.cookie } })).status, 404);
-    await s.stop();
   } finally {
-    rmSync(dataDir, { recursive: true, force: true });
+    await s.stop();
+  }
+});
+
+test('the key stays on the server: never sent back, kept for the same endpoint, dropped for another', async () => {
+  const s = await openServer();
+  const set = async body => (await s.call('/api/connection/set', JSON.stringify(body))).json();
+  const get = async () => (await s.call('/api/connection/get', '{}')).json();
+  const config = { endpoint: 'https://a.example/v1', model: 'm' };
+  try {
+    assert.deepEqual(await set({ config, apiKey: 'secret-1' }), { hasKey: true });
+    assert.deepEqual(await get(), { config, hasKey: true });
+    await set({ config: { ...config, model: 'm2' } });
+    assert.equal(JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8')).apiKey, 'secret-1');
+    assert.deepEqual(await set({ config: { ...config, endpoint: 'https://b.example/v1' } }), { hasKey: false });
+  } finally {
+    await s.stop();
+  }
+});
+
+test('bad requests never stop the server; image lists are kept; stored files run in a sandbox', async () => {
+  const s = await openServer();
+  const port = new URL(s.url).port;
+  const raw = line =>
+    new Promise((resolve, reject) => {
+      const sock = connect(port, '127.0.0.1', () => sock.end(`${line} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n\r\n`));
+      sock.on('data', d => resolve(String(d).split('\r\n')[0]));
+      sock.on('error', reject);
+    });
+  try {
+    assert.match(await raw('GET //['), /^HTTP\/1\.1 [45]\d\d/);
+    const manifest = await s.call('/api/assets/upload', '{"images":[]}', { 'Content-Type': 'application/json' });
+    const { id } = await manifest.json();
+    const back = await fetch(`${s.url}/assets/${id}`, { headers: { Cookie: s.cookie } });
+    assert.equal(await back.text(), '{"images":[]}');
+    assert.match(back.headers.get('content-security-policy'), /sandbox/);
+    const html = await s.call('/api/assets/upload', '<script>', { 'Content-Type': 'text/html' });
+    assert.equal(html.status, 400);
+    assert.equal((await fetch(s.url)).status, 200);
+  } finally {
+    await s.stop();
+  }
+});
+
+test('config.json: port, data folder (relative to standalone/) and extra host names', () => {
+  const dir = tempDir();
+  try {
+    const file = join(dir, 'config.json');
+    writeFileSync(file, JSON.stringify({ port: 3100, dataDir: 'my-data', hosts: ['my-pc.tail1234.ts.net'] }));
+    const c = loadConfig(file);
+    assert.equal(c.port, 3100);
+    assert.equal(basename(c.dataDir), 'my-data');
+    assert.deepEqual(c.extraHosts, ['my-pc.tail1234.ts.net']);
+    assert.deepEqual(loadConfig(join(dir, 'missing.json')), {});
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
   }
 });

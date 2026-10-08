@@ -3,28 +3,33 @@ import { platform } from '../../src/js/db.js';
 import { APP_VERSION } from '../../src/js/app.js';
 import { openSheet } from '../../src/js/sheet.js';
 import { openSettingsSheet } from '../../src/js/settings-sheet.js';
+import { N_ } from '../../src/js/i18n.js';
 import { $, esc } from '../../src/js/util.js';
 import { tr } from './i18n.js';
-import {
-  PROVIDERS,
-  configureProvider,
-  keyRemembered,
-  providerConfig,
-  providerKey,
-  providerUsage,
-} from './providers.js';
+import { PROVIDERS, providerConfig, providerHasKey, providerUsage, saveConnection } from './providers.js';
 
 const PROTOCOLS = [
-  ['compatible', 'OpenAI-compatible'],
+  ['compatible', N_('OpenAI-compatible')],
   ['openai', 'OpenAI'],
   ['anthropic', 'Anthropic'],
   ['gemini', 'Gemini'],
   ['azure', 'Azure OpenAI'],
   ['perplexity', 'Perplexity Sonar'],
 ];
+// form field -> connection setting
+const TEXT = {
+  Provider: 'provider',
+  Endpoint: 'endpoint',
+  Protocol: 'protocol',
+  Model: 'model',
+  Summary: 'summaryModel',
+  Version: 'apiVersion',
+};
+const NUMBERS = { Max: 'maxTokens', Budget: 'promptBytes', Retries: 'retries' };
+const CHECKS = { Stream: 'stream', Json: 'jsonMode', Vision: 'vision' };
 
 function panelHtml() {
-  const opts = list => list.map(([v, label]) => `<option value="${v}">${esc(label)}</option>`).join('');
+  const opts = list => list.map(([v, label]) => `<option value="${v}">${esc(tr(label))}</option>`).join('');
   const check = (id, label) => `<label class="row opt"><input id="${id}" type="checkbox">${label}</label>`;
   const field = (id, label, attrs = '') =>
     `<div class="field"><label for="${id}">${label}</label><input id="${id}" ${attrs}></div>`;
@@ -33,7 +38,6 @@ function panelHtml() {
     ${field('apiEndpoint', tr('API base URL'), 'type="url"')}
     <div class="field"><label for="apiProtocol">${tr('API protocol')}</label><select id="apiProtocol">${opts(PROTOCOLS)}</select></div>
     ${field('apiKey', tr('API key (optional for local models)'), 'type="password" autocomplete="off"')}
-    ${check('apiRemember', tr('Remember key on this device (stored unencrypted)'))}
     ${field('apiModel', tr('Model ID (Azure: deployment name)'), 'autocomplete="off"')}
     ${field('apiSummary', tr('Summary model ID (optional)'), 'autocomplete="off"')}
     ${field('apiVersion', tr('Azure API version'), 'placeholder="2024-10-21"')}
@@ -42,70 +46,42 @@ function panelHtml() {
     ${check('apiStream', tr('Stream replies'))}
     ${check('apiJson', tr('Request JSON mode (only if supported by the model)'))}
     ${check('apiVision', tr('Enable image analysis (vision model required)'))}
-    <p class="muted">${tr('API calls may cost money. Retries can make extra calls. Fast uses the summary model; Standard and Deep use the narration model. Keys are excluded from game saves and exports.')}</p>
+    <p class="muted">${tr('API calls may cost money. Retries can make extra calls. Fast uses the summary model; Standard and Deep use the narration model. The connection and key are kept on this computer, never in game saves or exports.')}</p>
     <div class="row"><button class="btn" id="apiSave">${tr('Save connection')}</button><button class="btn ghost" id="apiTest">${tr('Test connection (one API call)')}</button></div>
     <p id="apiStatus" role="status" class="muted"></p>
     <p class="muted">${tr('Session usage: {calls} calls, {input} input tokens, {output} output tokens (when reported)', providerUsage)}</p>
   </div></details>`;
 }
 
-const FIELDS = [
-  ['Provider', 'provider'],
-  ['Endpoint', 'endpoint'],
-  ['Protocol', 'protocol'],
-  ['Model', 'model'],
-  ['Summary', 'summaryModel'],
-  ['Version', 'apiVersion'],
-  ['Max', 'maxTokens'],
-  ['Budget', 'promptBytes'],
-  ['Retries', 'retries'],
-];
-
 // the host's bindSettings (src/js/host.js): runs each time the settings sheet is drawn
 export function bindProviderSettings(root) {
   root.querySelector('.ui-lang-field').insertAdjacentHTML('afterend', panelHtml());
   root.querySelector('#updBtn').onclick = openUpdateSheet;
+  if (!providerConfig().model) showSetupBanner(); // again in the screen language, which may have just changed
   const q = id => root.querySelector('#api' + id);
   const c = providerConfig();
-  for (const [id, key] of FIELDS) q(id).value = c[key] ?? '';
-  q('Key').value = providerKey();
-  q('Remember').checked = keyRemembered();
-  q('Stream').checked = c.stream !== false;
-  q('Json').checked = !!c.jsonMode;
-  q('Vision').checked = !!c.vision;
+  for (const [id, key] of Object.entries({ ...TEXT, ...NUMBERS })) q(id).value = c[key] ?? '';
+  for (const [id, key] of Object.entries(CHECKS)) q(id).checked = !!c[key];
+  const keyHint = () =>
+    (q('Key').placeholder = providerHasKey() ? tr('Saved on this computer. Leave blank to keep it.') : '');
+  keyHint();
   q('Provider').onchange = () => {
     const p = PROVIDERS.find(p => p.id === q('Provider').value);
     q('Endpoint').value = p.endpoint;
     q('Protocol').value = p.protocol;
-    q('Key').value = '';
-    q('Remember').checked = false;
-    q('Model').value = '';
-    q('Summary').value = '';
+    q('Key').value = q('Model').value = q('Summary').value = '';
   };
   const save = async () => {
-    const max = Number(q('Max').value),
-      budget = Number(q('Budget').value);
-    const bad = !Number.isInteger(max) || max < 64 || max > 65536 || !Number.isInteger(budget) || budget < 1000;
-    if (bad || budget > 2000000 || !q('Model').value.trim() || !q('Endpoint').value.trim())
+    const next = {};
+    for (const [id, key] of Object.entries(TEXT)) next[key] = q(id).value.trim();
+    for (const [id, key] of Object.entries(NUMBERS)) next[key] = Number(q(id).value);
+    for (const [id, key] of Object.entries(CHECKS)) next[key] = q(id).checked;
+    const counts = Object.values(NUMBERS).every(k => Number.isInteger(next[k]) && next[k] >= 0);
+    if (!next.model || !next.endpoint || !counts || !next.maxTokens || !next.promptBytes)
       throw new Error(tr('Enter an endpoint, model and valid limits.'));
-    configureProvider(
-      {
-        provider: q('Provider').value,
-        endpoint: q('Endpoint').value.trim(),
-        protocol: q('Protocol').value,
-        model: q('Model').value.trim(),
-        summaryModel: q('Summary').value.trim(),
-        apiVersion: q('Version').value.trim(),
-        maxTokens: max,
-        promptBytes: budget,
-        retries: Number(q('Retries').value),
-        stream: q('Stream').checked,
-        jsonMode: q('Json').checked,
-        vision: q('Vision').checked,
-      },
-      q('Key').value,
-      q('Remember').checked,
-    );
+    await saveConnection(next, q('Key').value);
+    q('Key').value = '';
+    keyHint();
     platform.limits = await platform.sample.limits();
     $('#noSample').classList.add('hidden');
     q('Status').textContent = tr('Connection saved.');

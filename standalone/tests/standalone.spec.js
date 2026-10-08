@@ -1,10 +1,9 @@
 // The standalone page end to end, with the provider mocked: a fresh server and data folder for each test.
 import { test, expect } from '@playwright/test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { startServer } from '../server.js';
 import { startLife } from '../../tests/support/harness.js';
+import { openServer } from './support.js';
 
 const reply = {
   narration: 'A fresh scene unfolds.',
@@ -20,29 +19,24 @@ const reply = {
   highlights: [],
   inherit: { name: 'Memory', grade: 'F', desc: 'Remember the journey.' },
 };
-let server, url, dataDir, models;
+let s, url, models;
 test.beforeEach(async () => {
-  dataDir = mkdtempSync(join(tmpdir(), 'dr-standalone-'));
   models = [];
-  server = await startServer({
-    port: 0,
-    dataDir,
+  s = await openServer({
     fetcher: async (_, { body }) => {
-      models.push(JSON.parse(body).model);
+      const request = JSON.parse(body);
+      models.push(request.model);
+      const array = request.messages[0].content.includes('JSON array');
       return Response.json({
         model: 'mock-model',
-        choices: [{ message: { content: JSON.stringify(reply) }, finish_reason: 'stop' }],
+        choices: [{ message: { content: JSON.stringify(array ? ['a', 'b'] : reply) }, finish_reason: 'stop' }],
         usage: { prompt_tokens: 10, completion_tokens: 5 },
       });
     },
   });
-  url = `http://127.0.0.1:${server.address().port}`;
+  url = s.url;
 });
-test.afterEach(async () => {
-  server.closeAllConnections();
-  await new Promise(resolve => server.close(resolve));
-  rmSync(dataDir, { recursive: true, force: true });
-});
+test.afterEach(() => s.stop());
 test.use({ locale: 'en-US' });
 
 async function configure(page, extra = {}) {
@@ -73,7 +67,13 @@ test('saves live on the server: they survive a reload and export/import without 
   await page.reload();
   await expect.poll(() => page.evaluate(() => DR.app.currentSave?.id)).toBe(saved.id);
   await expect.poll(() => page.evaluate(() => DR.app.turns.length)).toBe(saved.turns);
-  expect(await page.evaluate(() => localStorage.getItem('dr:provider-key'))).toBeNull();
+  // the key stayed on the server: kept across the reload, never handed to the page
+  expect(JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8')).apiKey).toBe('test-secret-never-export');
+  expect(await page.content()).not.toContain('test-secret');
+  await page.evaluate(() => DR.openSettingsSheet());
+  await expect(page.locator('#apiKey')).toHaveAttribute('placeholder', /Saved on this computer/);
+  await expect(page.locator('#apiModel')).toHaveValue('mock-model');
+  await page.evaluate(() => DR.closeSheet());
   const downloadEvent = page.waitForEvent('download');
   await page.evaluate(id => DR.exportSaveFile(id), saved.id);
   const bytes = readFileSync(await (await downloadEvent).path()).toString();
@@ -122,6 +122,10 @@ test('Fast uses the summary model, and summaries and Life Reviews work', async (
   await expect.poll(() => page.evaluate(() => DR.app.turns.some(t => t.kind === 'ai'))).toBe(true);
   await page.evaluate(() => DR.platform.sample('Say ok', { modelTier: 'quick', cache: false }));
   expect(models.at(-1)).toBe('mock-summary');
+  expect(await page.evaluate(() => DR.platform.sample.json('Reply with only a JSON array of tags.'))).toEqual([
+    'a',
+    'b',
+  ]);
   await page.evaluate(async () => {
     const turns = DR.app.turns,
       next = DR.app.state.next;

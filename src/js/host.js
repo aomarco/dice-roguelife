@@ -19,7 +19,7 @@
  *                signal, images }; sample.limits() -> { maxPromptBytes, images }. Failures carry .code, read by
  *                prompt.js (FATAL, sampleError): not_granted, rate_limited, refused, cancelled, sampling_disabled,
  *                session_expired, prompt_too_large.
- *   'assets'     the file store: upload(blob, { type }) -> { id }, list() -> { files, usage }, delete(id)
+ *   'assets'     the file store: upload(blob, { type }) -> { id }, list() -> { assets, usage }, delete(id)
  *   'user'       the player: id(), isOwner(), can(permission)
  *   'downloads'  save({ filename, data: Blob }) -> { status }
  */

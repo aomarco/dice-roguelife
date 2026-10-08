@@ -1,3 +1,3 @@
-// The standalone page: the game, with this add-on's host registered before the game starts (see ../README.md).
-import './register.js';
+// The standalone page: the host adapter (it registers itself), then the game (see ../README.md).
+import './host.js';
 import '../../src/js/main.js';

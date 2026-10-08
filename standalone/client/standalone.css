@@ -20,8 +20,10 @@
 .provider-fields .row {
   flex-wrap: wrap;
 }
-/* the artifact's plan-tier check and document quota don't apply here */
+/* the artifact's plan-tier check and document quota don't apply here (#dbGauge also shows export progress) */
 .tier-probe,
-#dbGauge {
+#dbGauge .gauge-head,
+#dbGauge .gauge-bar,
+#dbGauge .gauge-msg {
   display: none;
 }

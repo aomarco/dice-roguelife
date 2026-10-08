@@ -1,11 +1,8 @@
 import { test } from 'node:test';
 import { request as httpRequest } from 'node:http';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { providerRequest, normalizeEvent, readSSE, relaySample, httpError } from '../relay.js';
-import { startServer } from '../server.js';
+import { openServer } from './support.js';
 
 const input = (protocol = 'compatible', extra = {}) => ({
   config: { protocol, endpoint: 'https://example.com/v1', model: 'test-model', maxTokens: 512, ...extra },
@@ -165,42 +162,27 @@ test('cancellation reaches upstream fetch', async () => {
   c.abort();
   await assert.rejects(promise, { name: 'AbortError' });
 });
+const hostStatus = (url, host) =>
+  new Promise((resolve, reject) => {
+    const req = httpRequest(url, { headers: { Host: host } }, res => {
+      res.resume();
+      resolve(res.statusCode);
+    });
+    req.on('error', reject);
+    req.end();
+  });
+
 test('local relay rejects missing token, foreign origins and rebinding hosts', async () => {
-  const dataDir = mkdtempSync(join(tmpdir(), 'dr-relay-'));
-  const server = await startServer({ port: 0, dataDir });
-  const url = `http://127.0.0.1:${server.address().port}`;
+  const s = await openServer({ extraHosts: ['my-pc.tailnet.ts.net'] });
   try {
-    assert.equal((await fetch(url + '/api/sample', { method: 'POST', body: '{}' })).status, 403);
-    const page = await (await fetch(url)).text();
-    const token = /window.DR_SERVER_TOKEN="([a-f0-9]+)"/.exec(page)[1];
-    assert.equal(
-      (
-        await fetch(url + '/api/sample', {
-          method: 'POST',
-          headers: { 'X-DR-Token': token, Origin: 'https://attacker.example' },
-          body: '{}',
-        })
-      ).status,
-      403,
-    );
-    assert.equal(
-      await new Promise((resolve, reject) => {
-        const req = httpRequest(url, { headers: { Host: 'attacker.example' } }, res => {
-          res.resume();
-          resolve(res.statusCode);
-        });
-        req.on('error', reject);
-        req.end();
-      }),
-      403,
-    );
-    assert.equal(
-      (await fetch(url + '/api/sample', { method: 'POST', headers: { 'X-DR-Token': token }, body: '{}' })).status,
-      400,
-    );
+    assert.equal((await fetch(s.url + '/api/sample', { method: 'POST', body: '{}' })).status, 403);
+    assert.equal((await s.call('/api/sample', '{}', { Origin: 'https://attacker.example' })).status, 403);
+    assert.equal(await hostStatus(s.url, 'attacker.example'), 403);
+    // a name given in DR_HOSTS (a Tailscale address) is let in, from its own https origin
+    assert.equal(await hostStatus(s.url, 'my-pc.tailnet.ts.net'), 200);
+    assert.equal((await s.call('/api/sample', '{}', { Origin: 'https://my-pc.tailnet.ts.net' })).status, 400);
+    assert.deepEqual(await (await s.call('/api/sample', '{}')).json(), { code: 'not_configured' });
   } finally {
-    server.closeAllConnections();
-    await new Promise(resolve => server.close(resolve));
-    rmSync(dataDir, { recursive: true, force: true });
+    await s.stop();
   }
 });

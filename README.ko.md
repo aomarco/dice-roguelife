@@ -218,7 +218,7 @@ npm run release -- 2.2.0   # 버전 올리기, 검사, 테스트, 패키지
 
 플레이는 아티팩트로 하는 게 기본이에요. API 키나 로컬 모델(Ollama, LM Studio 등)로 내 컴퓨터에서 돌리고 싶은 분을 위해
 커뮤니티가 관리하는 애드온이 [standalone/](standalone/README.md)에 있어요: `npm ci` 다음 `npm start`. 아티팩트와는 별개이고,
-아티팩트 빌드에는 들어가지 않아요.
+아티팩트 빌드에는 들어가지 않아요. 폰에서도 하고 싶다면 Tailscale로 내 컴퓨터에 접속하면 돼요(그 README 참고).
 
 ## 라이선스
 
