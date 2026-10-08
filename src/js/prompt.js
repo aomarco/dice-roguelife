@@ -17,8 +17,6 @@ import { charSets, fitsWorld } from './images.js';
 import { placeVocab } from './places.js';
 import { setIds } from './casting.js';
 import { widgetOf } from './widgets.js';
-import { host } from './host.js';
-import { parseReply, validNarration } from './providers.js';
 
 export let prompts = PR_DEFAULT; // narrator prompt text; config/prompt in the db overrides field by field
 // a prompts.json map keyed by story language ("lang", "tip", "ledgerLang", "summaryLang")
@@ -581,17 +579,6 @@ export async function callNarrator(text, cmd, turn) {
   const onText = turn.onText; // what to do with the reply as it streams (turn.js streamedReply)
   const ok = o => o && (String(o.narration || '').trim().length > 0 || o.widget);
   const signal = turn.abort && turn.abort.signal;
-  if (host().id === 'browser') {
-    const reply = await platform.sample.json(prompt, { modelTier: setting('tier'), cache: cacheOpt(), onText, signal });
-    if (!validNarration(reply)) {
-      stale();
-      throw Object.assign(new Error(T('The reply has invalid field types. Retry this turn.')), { code: 'no_json' });
-    }
-    const out = normalize(reply);
-    if (ok(out)) return out;
-    stale();
-    throw Object.assign(new Error(T('The reply has no narration. Retry this turn.')), { code: 'no_json' });
-  }
   try {
     const o = normalize(
       await platform.sample.json(prompt, {
@@ -653,13 +640,39 @@ export async function callNarrator(text, cmd, turn) {
   }
 }
 function extractJson(t) {
+  if (!t) return null;
+  t = String(t).replace(/```(?:json)?/gi, '');
+  const a = t.indexOf('{'),
+    b = t.lastIndexOf('}');
+  if (a < 0 || b < a) return null;
+  const body = t.slice(a, b + 1);
   try {
-    return parseReply(t);
+    return JSON.parse(body);
   } catch {
+    // not plain JSON: try the lenient form below
+  }
+  try {
+    return JSON.parse(body.replace(/,\s*([}\]])/g, '$1').replace(/[\u0000-\u001f]+/g, ' '));
+  } catch {
+    // still not JSON: try closing a truncated object below
+  }
+  // truncated output: close open strings/brackets and retry
+  let fixed = body;
+  const q = (fixed.match(/(?<!\\)"/g) || []).length;
+  if (q % 2) fixed += '"';
+  let depth = 0;
+  for (const ch of fixed) {
+    if (ch === '{' || ch === '[') depth++;
+    else if (ch === '}' || ch === ']') depth--;
+  }
+  fixed = fixed.replace(/,\s*$/, '');
+  while (depth-- > 0) fixed += '}';
+  try {
+    return JSON.parse(fixed);
+  } catch (e) {
     return null;
   }
 }
-
 const noDash = t =>
   String(t)
     .replace(/\s*—+\s*/g, m => (/\s$/.test(m) && /^\s/.test(m) ? ', ' : ', '))

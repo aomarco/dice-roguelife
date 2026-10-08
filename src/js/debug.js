@@ -1,5 +1,4 @@
 /* ============ debug handle ============ */
-import * as providers from './providers.js';
 import * as hostClaude from './host-claude.js';
 import * as host from './host.js';
 import * as util from './util.js';
@@ -50,7 +49,6 @@ import * as imagesView from './images-view.js';
 //   DR.toast = fn, or DR.mock('toast', fn)                       replace a function a module lists in its `mocks`
 //   DR.mock('toast', null)                                        put the original back
 const MODULES = [
-  providers,
   hostClaude,
   host,
   i18n,

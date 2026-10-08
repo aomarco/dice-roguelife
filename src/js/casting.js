@@ -1,5 +1,3 @@
-import { host } from './host.js';
-import { providerConfig } from './providers.js';
 /* ============ casting: a portrait set for each person ============ */
 import { pick, toast } from './util.js';
 import { EMOS, normGender } from './data.js';
@@ -397,7 +395,6 @@ function bestGeneric(who) {
   const top = Math.max(...gen.map(sc));
   return pick(gen.filter(k => sc(k) === top));
 }
-const portraitAI = () => host().id !== 'browser' || !!providerConfig().portraitAI;
 const AI_PENDING = {}; // name -> Promise<key|'none'|null>, started while the reply is still streaming
 function isNewLead({ name, weight }) {
   return (
@@ -410,7 +407,7 @@ function isNewLead({ name, weight }) {
   );
 }
 export let startAiPick = function startAiPick(c) {
-  if (!portraitAI() || !platform.sample || AI_PENDING[c.name] || !isNewLead(c)) return;
+  if (!platform.sample || AI_PENDING[c.name] || !isNewLead(c)) return;
   let cands = [];
   const pr = (async () => {
     try {
@@ -446,7 +443,7 @@ export let startAiPick = function startAiPick(c) {
   AI_PENDING[c.name] = pr;
 };
 // always on; without a model the word-score path (castFor) takes over
-export const aiWillPick = who => portraitAI() && !!platform.sample && (!!AI_PENDING[who.name] || isNewLead(who));
+export const aiWillPick = who => !!platform.sample && (!!AI_PENDING[who.name] || isNewLead(who));
 function applyPick(n, k, info) {
   // a finished pick: the face for the rest of this life, or a silhouette when the model found nothing
   if (!k || app.state.cast[n]) return false;

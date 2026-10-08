@@ -1,0 +1,27 @@
+/* standalone add-on (standalone/client/standalone.css) */
+.provider-fields {
+  white-space: normal;
+}
+.provider-fields,
+.provider-fields * {
+  box-sizing: border-box;
+}
+.provider-fields .field {
+  margin-top: 10px;
+}
+.provider-fields input:not([type='checkbox']),
+.provider-fields select {
+  width: 100%;
+  min-width: 0;
+}
+.provider-fields .grow {
+  min-width: 0;
+}
+.provider-fields .row {
+  flex-wrap: wrap;
+}
+/* the artifact's plan-tier check and document quota don't apply here */
+.tier-probe,
+#dbGauge {
+  display: none;
+}

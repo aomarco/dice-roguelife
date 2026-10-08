@@ -1,4 +1,5 @@
-// Lint rules for the game's modules (src/js), the Node tools (tools/, the configs) and the tests (tests/).
+// Lint rules for the game's modules (src/js), the Node tools (tools/, the configs), the tests (tests/) and the
+// standalone add-on (standalone/).
 import globals from 'globals';
 
 const rules = {
@@ -51,5 +52,25 @@ export default [
     // injected into the page before it loads (tests/support/test.js), so it runs in the browser as a plain script
     files: ['tests/support/dbmock.js'],
     languageOptions: { sourceType: 'script', globals: globals.browser },
+  },
+  // the standalone add-on: its page code, its local server, its tests
+  {
+    files: ['standalone/client/**/*.js'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.browser },
+    rules,
+  },
+  {
+    files: ['standalone/*.js'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: globals.node },
+    rules,
+  },
+  {
+    files: ['standalone/tests/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: { ...globals.node, ...globals.browser, DR: 'readonly' },
+    },
+    rules,
   },
 ];

@@ -8,6 +8,8 @@
  *   connect(capability)   a Promise of that capability's handle, or null when the host does not give it
  *   assetUrl(id)          the URL an uploaded file is served from: a fixed prefix, then the id (the story export
  *                         finds the pictures to embed by that prefix)
+ *   bindSettings(root)    optional: adds the host's own controls to the ⚙ settings sheet once it is drawn
+ * An adapter outside this build (the standalone add-on, standalone/) joins with registerHost() before the game starts.
  * The handles connect() returns must offer what the game uses (and nothing else is assumed):
  *   'db'         a document store: doc(path).get() -> { exists, id, data() }, .set(data), .delete(), and
  *                collection(path) with .where(field, op, value), .orderBy(field, dir), .limit(n), .get() -> { docs },
@@ -22,12 +24,15 @@
  *   'downloads'  save({ filename, data: Blob }) -> { status }
  */
 import { claudeHost } from './host-claude.js';
-import { browserHost } from './host-browser.js';
 
-const HOSTS = [claudeHost, browserHost];
+const HOSTS = [claudeHost];
 const NO_HOST = { id: 'none', available: () => true, connect: async () => null, assetUrl: id => id }; // a plain browser: no capabilities, the game runs in memory
 
 let chosen = null;
+
+export function registerHost(h) {
+  HOSTS.push(h);
+}
 
 // the adapter for the host this page runs on, picked on first use (the runtime is in place before the page starts)
 export function host() {

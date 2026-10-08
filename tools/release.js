@@ -24,8 +24,8 @@ import { check as checkI18n } from './i18n-check.js';
 const OUT = process.env.OUT_DIR || join(ROOT, 'dist');
 const RELEASED = join(ROOT, 'tools', '.released_prompt.json');
 const MARK = 'tools/.released_prompt.json'; // its path inside the package
-const LINTED = ['src/js', 'tools', 'tests']; // what ESLint and the comment scan read
-const FORMATTED = ['src', 'tools', 'tests', 'eslint.config.js', 'playwright.config.js']; // what Prettier keeps in shape
+const LINTED = ['src/js', 'tools', 'tests', 'standalone']; // what ESLint and the comment scan read
+const FORMATTED = ['src', 'tools', 'tests', 'standalone', 'eslint.config.js', 'playwright.config.js']; // what Prettier keeps in shape
 const NOT_PACKAGED = new Set(['.git', 'node_modules', 'dist', 'data', 'shots', 'test-results', 'playwright-report']); // data: local image libraries, never shipped
 const USAGE = 'usage: node tools/release.js <x.y.z> [--fast] | --check | --mark-prompt';
 

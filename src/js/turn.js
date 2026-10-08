@@ -5,7 +5,6 @@ import { askOf, cmdIs, normEmo } from './data.js';
 import { ENTRY_LABEL, STANCE_LABEL } from './enums.js';
 import { T } from './i18n.js';
 import { platform } from './db.js';
-import { host } from './host.js';
 import { NEW_SAVES, turnStore } from './turn-store.js';
 import { app, currentRun, exclusive } from './app.js';
 import { critOf, rollGrade, rule } from './rules.js';
@@ -500,10 +499,6 @@ function playTurnCue(res, turn) {
   else if ((res.deltas.gold || 0) >= 100) cueItem();
 }
 export function sampleError(e) {
-  if (host().id === 'browser') {
-    toast(T('Error: {msg}', { msg: e?.message || e?.code || T('unknown') }), 6000);
-    return;
-  }
   const c = e && e.code;
   toast(
     c === 'rate_limited'

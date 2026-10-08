@@ -1,105 +1,236 @@
 English | [한국어](README.ko.md) | [日本語](README.ja.md)
 
-# Dice Roguelife — standalone, bring your own AI
+# Dice Roguelife - a roguelike AI chat game
 
-A text roguelike where dice decide your world, character and fate, and an AI narrates your life.
-Die, return in a new body, and carry something forward. This modified checkout runs in a normal browser:
-**no Claude subscription or artifact account is required.**
+> ## 📖 The guide
+> **English: https://wonjoonseol-ws.github.io/dice-roguelife/** · **한국어: https://wonjoonseol-ws.github.io/dice-roguelife/?lang=ko** · **日本語: https://wonjoonseol-ws.github.io/dice-roguelife/?lang=ja**
+> How to start, the dice modes and setting up images, with screenshots. Install and update steps are right below.
 
-## Start playing
+> ## 🎁 Sample image pack (free assets)
+> Ready-to-use example files: **6 shadow images** and a tag file (3 characters with 9 images, 4 backgrounds).
+> **[Download sample-pack.zip](https://github.com/wonjoonSeol-WS/dice-roguelife/releases/download/free-pack-v1/sample-pack.zip)**
+>
+> Free assets are few, so **image contributions are welcome!** See "Image contributions welcome" on the [guide](https://wonjoonseol-ws.github.io/dice-roguelife/).
 
-Install Node.js 20.19+, 22.13+, or 24+ and run these commands in this directory:
+A text roguelike where the dice decide your world, race, standing and talent, and Claude narrates that life in the style
+of a web novel. You type your character's lines and actions, and a d100 check rolls whenever the outcome could go either
+way. When you die, you regress and are reborn in a different body in a different world, carrying one thing from the life
+before.
 
-```sh
-npm ci
-npm start
+The screen comes in English, Korean and Japanese: the game starts in your browser's language, and you can switch in
+**⚙ Settings → Language**. Each save keeps the story language it began in (English, Korean or Japanese), and you can type in any
+language: the narrator answers in the story language.
+
+- Genre worlds (hunter, murim martial arts, romance fantasy, apocalypse, tower climbing and more) and grades from EX to F
+- Luck: check dice, critical successes and failures, daily luck, the Gambler's Stone
+- News, quest board, community board and messenger widgets, and `/commands`
+- Rewrites, branches, check questions (objections) and corrections
+- An image library: upload character portraits and backgrounds and the game puts them in scenes
+- Life Reviews and the Hall, story export (Markdown, HTML), save file export and import
+
+## Install and update (in the Claude app, phones too)
+
+### Before you start (once)
+
+1. In your **phone's browser** (not the app), open [claude.ai Settings → Capabilities](https://claude.ai/settings/capabilities). Sign in first if you aren't.
+2. Turn on **Code execution and file creation**
+3. Turn on **Allow network egress**
+   - This option **isn't in the app's settings**; turn it on in a browser. Once it's on, it applies to the app too.
+   - Some accounts have it off by default.
+4. Go back to the app and start a **new chat**. Chats that were already open don't pick up the new setting.
+5. If a new chat is still blocked, the setting can take **a few minutes** to apply. Try again in about 5 minutes.
+
+![Claude Settings → Capabilities: turn on Code execution and file creation and Allow network egress](docs/images/egress-setting.png)
+
+### Install
+
+Paste this into a new chat as is.
+
+```
+Download the latest dice-roguelife.html from the link below and publish it as my artifact.
+It needs the db, sample, user, assets and downloads capabilities.
+https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
 ```
 
-Open **http://localhost:3000**, then **Settings → AI connection**:
+Open the published link and play. The first time it runs, Claude asks you to **confirm the connection**. **Tap OK** so the game can call Claude to write the story.
 
-1. Choose a provider or local model server.
-2. Paste your API key, if required.
-3. Enter the exact model ID from your provider (Azure: deployment name).
-4. Save the connection. The optional connection test makes one API call.
-5. Start a life and play.
+### Update
 
-Dependencies are already installed in this checkout. Subsequent launches need only `npm start`.
-The server builds the page at startup. Keep the server running while playing.
-Use the same browser, hostname and port each time: browser storage is tied to that origin.
+Your saves are tied to the artifact link. **A new artifact starts with no saves**, so always overwrite the link you've been using. Updating reloads the page, so send anything you were typing first.
 
-## Providers
+In the game, ⚙ Settings → **Check for updates** writes this prompt for you (paste your link and it fills itself in). You can also write it yourself; just replace the link on the last line with your artifact's address.
 
-| Connection | Available presets |
+```
+Use the computer tool (bash) to download the file with the command below. Don't use web fetch.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+Check that the file is an HTML file of a few hundred KB, then overwrite my artifact at the link below instead of creating a new one.
+Set its capabilities to db, sample, user, assets, downloads and artifact.
+My artifact: (paste your artifact link here)
+```
+
+### If you get stuck
+
+- **Claude says "GitHub blocked automated access" or couldn't download the file**: it tried web fetch. Send the prompt below instead; it makes Claude download the file with the computer tool (bash).
+
+```
+Use the computer tool (bash) to download the file with the command below. Don't use web fetch; GitHub blocks it.
+curl -L -o dice-roguelife.html https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest/download/dice-roguelife.html
+Check that the file is an HTML file of a few hundred KB (not an error message),
+then publish it as my artifact with the db, sample, user, assets, downloads and artifact capabilities turned on.
+```
+
+- **`403 host_not_allowed` / `Host not in allowlist: github.com`**: network egress is off, or the chat was started before you turned it on. Check the setting in a browser and try again in a **new chat**. If you just turned it on, it can take a few minutes: **try again in 5 minutes**.
+- **Still blocked in a new chat**: on a work or school account, an admin may have restricted network access. If the setting only allows chosen domains, add `github.com` and `release-assets.githubusercontent.com`.
+- **Still not working**: download `dice-roguelife.html` from the link above in a browser, attach it to the chat, and send "Publish this file as my artifact with the db, sample, user, assets and downloads capabilities turned on."
+
+## Where it runs
+
+**Only as a claude.ai artifact.** Opened as a normal website, it can't call Claude and the game won't start. The page uses
+these capabilities the artifact provides:
+
+| Capability | Used for |
 | --- | --- |
-| Dedicated protocols | OpenAI, Anthropic API, Google Gemini, Azure OpenAI, Perplexity Sonar |
-| Compatible services | OpenRouter, Groq, DeepSeek, Mistral, xAI, Together, Fireworks, DeepInfra, Cerebras, NVIDIA NIM, Hugging Face |
-| Local models | Ollama, LM Studio, llama.cpp, vLLM |
-| Custom | Editable compatible endpoint and model ID, or a supported native protocol |
+| `db` | Saves, settings, the Hall, the image list (a database for each artifact) |
+| `sample` | Narration (calling Claude) |
+| `user` | Keeping each player's saves apart |
+| `assets` | Portrait and background image files |
+| `downloads` | Exporting stories and save files |
 
-Presets provide endpoint configuration, not a guarantee that every model supports every feature.
-Use a chat/text model capable of following JSON instructions. Enable JSON mode only when supported.
-Turn streaming off if your endpoint does not support it. Remote endpoints must use HTTPS;
-local model servers can use HTTP on localhost. No API key is required for keyless local servers.
-Azure needs its resource base URL, such as `https://YOUR-RESOURCE.openai.azure.com`, and a deployment name.
-Bedrock and Vertex IAM authentication are outside this version.
+**The repository has no image assets.** You can play text-only without images; portraits and backgrounds are uploaded per
+artifact in the game's Images tab. Files named like `female3_smile.png` (set_emotion) or `bg_tavern_night.png` are sorted
+into their kind and set automatically.
 
-Model IDs are editable rather than tied to a hard-coded catalogue. Choose your provider's actual available model.
-For Ollama, first download a model and run Ollama; enter that model's name in the app.
+## Publishing your own artifact (for developers building it yourself)
 
-## Cost and keys
+1. Build the page. You need Node.js (see "Development" below).
+   ```
+   npm ci
+   npm run build
+   ```
+   The result is one file, `dist/dice-roguelife.html`.
+2. Upload the file to a claude.ai chat and ask Claude to publish it as an artifact. Mention that it needs the capabilities
+   in the table above (`db`, `sample`, `user`, `assets`, `downloads`).
+3. Play from the published link. **Saves are tied to that artifact.** When you move to a new version later, overwrite the
+   same link instead of creating a new artifact, or the saves won't carry over. ⚙ Settings → "Check for updates" in the
+   game gives you a request you can paste as is.
 
-API services bill your API account independently of chat subscriptions. Local inference can avoid provider fees.
-You control the maximum output tokens, prompt byte limit and retries. Retries default to **zero**;
-malformed replies do not silently cause more narration calls or switch providers.
-Summaries and life reviews are separate model calls. AI portrait selection is opt-in because it makes extra calls. An optional summary model also serves the Fast tier;
-Standard and Deep use your narration model. Usage shows reported tokens for successful calls, not exact costs.
+The narration prompt goes into the page from `prompts.json` at build time. If the artifact database has a
+`config/prompt` document, its values take precedence field by field (see [RELEASING.md](RELEASING.md)).
 
-Keys remain in memory by default and must be entered again after reloading. Remembering a key is opt-in and
-stores it **unencrypted on this device**. Keys are kept separately from game saves and exports.
-The loopback relay avoids browser CORS restrictions and does not persist keys on disk.
+## Cost: compared with chat services like Crack
 
-## Saves, images and migration
+Crack (a Korean AI chat service) is prepaid: you top up and each call costs money. This game runs inside your monthly
+Claude subscription.
 
-Saves, settings and uploaded portraits/backgrounds persist in IndexedDB in this browser.
-They survive reloads, but clearing browser data removes them. There is no automatic cloud synchronization.
+Comparing Claude's $20 plan (flat) with Crack's pay-per-call. These are simulated figures and may differ in practice.
 
-- Export game backups from **Saves → Save file**; import the same files into another installation.
-- Existing Claude artifact save exports use the same format and can be imported here.
-- Export images and tags from the Images tab; upload images and import tags in another installation.
-- Export stories as Markdown or HTML; HTML exports embed the images they display.
-- Manual tags and portrait matching work locally. Enable image analysis to use auto-sort with a vision-capable model (up to 8 MB per image).
+- Crack: 61 KRW per call with Sonnet
+- Claude $20 plan: about 28,000 KRW at 1,400 KRW to the dollar
 
-The screen and stories support English, Korean and Japanese. The original game features remain:
-dice checks, luck, worlds, rewrites, branches, objections, quests, messengers, memory and Life Reviews.
-See the [original gameplay guide](https://wonjoonseol-ws.github.io/dice-roguelife/) for game mechanics;
-its Claude installation instructions apply only to the original artifact version.
+| Calls per month | Crack (prepaid, 61 KRW a call) | This game (Claude $20 plan) |
+| ---: | ---: | ---: |
+| 100 | 6,100 KRW | 28,000 KRW |
+| 300 | 18,300 KRW | 28,000 KRW |
+| **about 460 (15 a day)** | **28,060 KRW** | **28,000 KRW** |
+| 600 | 36,600 KRW | 28,000 KRW |
+| 800 | 48,800 KRW | 28,000 KRW |
+| 1,000* | 61,000 KRW | 28,000 KRW* |
+| 1,500* | 91,500 KRW | 28,000 KRW* |
 
-## Development and updates
+- Past 460 calls a month, this game is cheaper.
+- A realistic figure is **about 800 a month**: 48,800 KRW on Crack, 28,000 KRW here.
+- If you already subscribe to Claude, there's nothing extra to pay.
+- Subscriptions have usage limits. It isn't unlimited, and Anthropic sets the limits.
 
-```sh
-npm run build       # standalone HTML, and the optional artifact build
-npm run lint        # syntax, ESLint, formatting and translations
-npm run test:api    # relay/protocol tests, no paid calls
-npm test            # game and standalone browser tests
+\* 1,000 and 1,500 are reference numbers for comparing prices. Using that much in a month on the $20 plan is hard in
+practice; you may need a pricier plan to use more.
+
+### Who gains when you send more of the story
+
+- A service with a fixed price per call charges the same however much you send, so it profits by sending less. That's why
+  story memory tends to get short.
+- This game lets you decide how much of the recent story to send (⚙ Settings, default 40,000 bytes, 10,000 to 200,000).
+- The more you send, the better it remembers the story.
+- It also uses up your subscription faster. If you hit the limit often, lower it.
+
+![Recent memory size setting](docs/images/context-size-en.png)
+
+## Design decision: why ship as an artifact
+
+**Goal:** let people who aren't developers deploy the app without servers, API keys or billing setup, and **use it right
+away on their own account**.
+
+### Decision
+
+Ship it as a single claude.ai artifact. The artifact provides Claude calls (`sample`), storage (`db`), image files
+(`assets`) and telling users apart (`user`), and the cost comes out of **each user's own Claude subscription**.
+
+### Compared with other options
+
+| Option | Why not |
+| --- | --- |
+| API keys | You have to create and paste a key, and every call costs money, so spending is hard to predict. |
+| Operator's server | The server and database need constant running, and the operator pays for every user's calls. |
+| **Artifact (chosen)** | No server, no keys, no billing setup. Nothing to pay to run it. |
+
+### What we gained
+
+- Open the link and start; no install or setup.
+- No running costs, so it can stay up for a long time.
+- A flat rate, so you know the monthly cost in advance.
+
+### What we accepted
+
+| Trade-off | How to deal with it |
+| --- | --- |
+| **Limited storage** (it fills up after long play) | When full, nothing new is saved. In the Saves tab, **export old saves, then delete them** to free space. |
+| **Safety filters are stricter than the API's** | Jailbreak-style experiences aren't possible. **For adult content, keep using services like Crack.** |
+| Saves are tied to the artifact | Always update by overwriting the same link. |
+| Images are separate for each artifact | Upload them again in the Images tab, or move them with `Export pack`. |
+| Anthropic sets the usage limits | I can't change them. Sending less recent story helps. |
+| It depends on one host (Claude) | See Extensibility below. |
+
+![Exporting and deleting saves](docs/images/saves-export-en.png)
+![When storage is full](docs/images/quota-full-en.png)
+
+### Extensibility
+
+Everything that touches the host (where the game runs) is gathered in one adapter, `src/js/host.js`. Today **only Claude
+is supported**; another adapter could add a host like Gemini. GPT has nothing like artifacts, so there are no plans for it.
+
+## Development
+
+You need Node.js 22.13 or later. The dev tools are all npm packages pinned in `package.json`.
+
+```
+npm ci                             # esbuild, ESLint, Prettier, Playwright (pinned versions)
+npx playwright install chromium    # the test browser, once
+
+npm run build      # src/ → dist/dice-roguelife.html
+npm run lint       # syntax, ESLint, Prettier format, code swallowed by comments, translations
+npm run format     # format with Prettier
+npm test           # all Playwright tests (3 in parallel)
+npm run release -- 2.5.0   # bump the version, check, test, package
 ```
 
-Install the test browser once with `npx playwright install chromium`.
-See [STANDALONE.md](STANDALONE.md) for architecture, credentials, adapter extension and verification limits.
-Existing [ARCHITECTURE.md](ARCHITECTURE.md) sections describe the original game and artifact storage.
+- The source is in `src/`. Files in `src/js/` are ES modules; the build bundles them from `main.js` with esbuild into the
+  page.
+- Screen text is written in English and translated through `src/locales/ko.json`; see [CLAUDE.md](CLAUDE.md)
+  ("Translation").
+- Only the host adapter `src/js/host-claude.js` uses the artifact runtime (`window.claude`). To add another host, write
+  another adapter that follows the contract in `host.js`.
+- The version lives in one place: `version` in `package.json`.
+- Run one test with `npx playwright test smoke`, watch it in a browser with `--headed`, and step through a failure with
+  `npx playwright show-trace` or `--ui`.
+- See [ARCHITECTURE.md](ARCHITECTURE.md) for the structure, the turn flow and the save format, and
+  [RELEASING.md](RELEASING.md) for the release steps (both in Korean).
 
-Export backups before updating. Stop the server, review/merge upstream changes, run `npm ci`, and restart
-with `npm start`. This checkout contains local modifications; upstream `git pull` may require a merge.
-Do not replace it with an upstream Claude-only release HTML file.
+## Optional: standalone (for developers)
 
-To change the port in PowerShell: `$env:PORT=3001; npm start`. Changing the origin changes which browser saves you see.
-This relay is intended for local use, not public hosting.
-
-## Optional Claude artifact mode
-
-The existing Claude adapter still runs when the page is published inside a Claude artifact.
-Build with `npm run build` and publish `dist/dice-roguelife.html` with the original db/sample/user/assets/downloads
-capabilities. That mode uses the artifact's storage and subscription; API connection controls are for standalone mode.
+The artifact is the way to play. For people who would rather run the game on their own computer with an API key or a
+local model (Ollama, LM Studio and others), there is a community-maintained add-on in [standalone/](standalone/README.md):
+`npm ci`, then `npm start`. It is not part of the artifact, and the artifact build doesn't include it.
 
 ## License
 
-[MIT](LICENSE). Original game by wonjoonSeol-WS; this checkout adds standalone provider support.
+[MIT](LICENSE)

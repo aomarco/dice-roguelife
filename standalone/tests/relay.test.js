@@ -1,8 +1,11 @@
 import { test } from 'node:test';
 import { request as httpRequest } from 'node:http';
 import assert from 'node:assert/strict';
-import { providerRequest, normalizeEvent, readSSE, relaySample, httpError } from '../tools/provider-api.js';
-import { startServer } from '../tools/server.js';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { providerRequest, normalizeEvent, readSSE, relaySample, httpError } from '../relay.js';
+import { startServer } from '../server.js';
 
 const input = (protocol = 'compatible', extra = {}) => ({
   config: { protocol, endpoint: 'https://example.com/v1', model: 'test-model', maxTokens: 512, ...extra },
@@ -163,7 +166,8 @@ test('cancellation reaches upstream fetch', async () => {
   await assert.rejects(promise, { name: 'AbortError' });
 });
 test('local relay rejects missing token, foreign origins and rebinding hosts', async () => {
-  const server = await startServer({ port: 0 });
+  const dataDir = mkdtempSync(join(tmpdir(), 'dr-relay-'));
+  const server = await startServer({ port: 0, dataDir });
   const url = `http://127.0.0.1:${server.address().port}`;
   try {
     assert.equal((await fetch(url + '/api/sample', { method: 'POST', body: '{}' })).status, 403);
@@ -197,5 +201,6 @@ test('local relay rejects missing token, foreign origins and rebinding hosts', a
   } finally {
     server.closeAllConnections();
     await new Promise(resolve => server.close(resolve));
+    rmSync(dataDir, { recursive: true, force: true });
   }
 });

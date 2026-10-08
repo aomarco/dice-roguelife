@@ -4,7 +4,6 @@ import { app, APP_VERSION, RELEASES_URL } from './app.js';
 import { saveSettings } from './settings.js';
 import { openSheet } from './sheet.js';
 import { T } from './i18n.js';
-import { host } from './host.js';
 
 // The artifact's CSP blocks GitHub, so the player pastes a request into a new Claude chat. It must overwrite this same
 // artifact (saves live in its database) and fetch with curl (GitHub blocks Claude's web reader).
@@ -22,12 +21,6 @@ function updateRequestText(link) {
 }
 
 export function openUpdateSheet() {
-  if (host().id === 'browser') {
-    openSheet(
-      `<h3>${T('Check for updates')}</h3><p>${T('Standalone version v{version}', { version: esc(APP_VERSION) })}</p><p>${T('Export a backup, then stop the server and run git pull, npm ci and npm start. Keep the same browser and port to retain local saves. Review upstream changes before updating this modified checkout.')}</p><button class="btn" data-close>${T('Close')}</button>`,
-    );
-    return;
-  }
   openSheet(`<h3>${T('Check for updates')}</h3>
     <p class="upd-p">${T('You are on <b>v{version}</b>. See new versions and what changed on the <a href="{url}" target="_blank" rel="noopener">GitHub releases page</a>.', { version: esc(APP_VERSION), url: RELEASES_URL })}</p>
     <p class="upd-p muted">${T('To update, copy the request below and paste it into a <b>new Claude chat</b>. This artifact\'s link has to go with it, so the same link is overwritten and your saves stay. Claude can only download the file with <b>Allow network egress</b> turned on in its settings. If you get stuck, see "If you get stuck" in the <a href="{guide}" target="_blank" rel="noopener">install guide</a>.', { guide: GUIDE_URL })}</p>
