@@ -164,6 +164,9 @@ export function httpError(status, data = '') {
             : 'invalid_request';
   if (/insufficient_quota|insufficient.*(balance|credit)|credit balance/i.test(data)) code = 'insufficient_credit';
   else if (/context_length|context window|too many tokens/i.test(data)) code = 'prompt_too_large';
+  // Gemini answers a bad key with 400, and an unknown model (on every provider) comes back as 404
+  else if (/API_KEY_INVALID|API key not valid|invalid.{0,10}api.?key/i.test(data)) code = 'not_granted';
+  else if (status === 404 || /model.{0,80}(not found|does not exist|not supported)/i.test(data)) code = 'no_model';
   return apiError(code, `HTTP ${status}`);
 }
 

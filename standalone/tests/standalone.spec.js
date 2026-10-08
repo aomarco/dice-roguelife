@@ -1,8 +1,10 @@
 // The standalone page end to end, with the provider mocked: a fresh server and data folder for each test.
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { startLife } from '../../tests/support/harness.js';
-import { openServer } from './support.js';
+import { buildPage } from '../page.js';
+import { openServer, tempDir } from './support.js';
 
 const reply = {
   narration: 'A fresh scene unfolds.',
@@ -18,10 +20,17 @@ const reply = {
   highlights: [],
   inherit: { name: 'Memory', grade: 'F', desc: 'Remember the journey.' },
 };
-let s, url, models;
+let s, url, models, built;
+// the real page, built once and served as the download serves it
+test.beforeAll(async () => {
+  built = tempDir();
+  writeFileSync(join(built, 'page.html'), (await buildPage()).html);
+});
+test.afterAll(() => rmSync(built, { recursive: true, force: true }));
 test.beforeEach(async () => {
   models = [];
   s = await openServer({
+    pageFile: join(built, 'page.html'),
     fetcher: async (_, { body }) => {
       const request = JSON.parse(body);
       models.push(request.model);

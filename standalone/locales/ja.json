@@ -33,7 +33,6 @@
   "Connection saved.": "接続を保存しました。",
   "Connected: {model}": "接続しました：{model}",
   "Standalone version v{version}": "スタンドアロン版 v{version}",
-  "Stop the server, then run git pull, npm ci and npm start. Your saves stay in standalone/data.": "サーバーを止めてから git pull、npm ci、npm start を順に実行してください。セーブは standalone/data にそのまま残ります。",
   "Choose an AI provider and model in Settings to start playing.": "設定で AI プロバイダーとモデルを選ぶとプレイできます。",
   "Start the app with npm start, then reload this page.": "npm start でアプリを起動してから、このページを再読み込みしてください。",
   "Check the endpoint, model and limits in Settings.": "設定でエンドポイント、モデル、上限を確認してください。",
@@ -52,7 +51,6 @@
   "The reply was not valid JSON.": "応答が正しい JSON ではありません。",
   "Request failed.": "リクエストに失敗しました。",
   "Server settings": "サーバー設定",
-  "Kept in standalone/config.json on this computer.": "このコンピューターの standalone/config.json に保存されます。",
   "Port": "ポート",
   "Data folder (saves, images, AI connection)": "データフォルダー（セーブ、画像、AI 接続）",
   "Names for other devices, one per line (Tailscale)": "他の端末から接続する名前、1行に1つ（Tailscale）",
@@ -64,5 +62,11 @@
   "Advanced": "詳細設定",
   "That profile is gone. Choose another in Settings.": "そのプロファイルはもうありません。設定で別のプロファイルを選んでください。",
   "This is too large to store.": "大きすぎて保存できません。",
-  "Now: port {port}, {path}": "現在：ポート {port}、{path}"
+  "Now: port {port}, {path}": "現在：ポート {port}、{path}",
+  "Kept in config.json in the app-data folder on this computer, with your saves.": "このコンピューターのアプリデータフォルダーに、セーブと一緒に config.json として保存されます。",
+  "Empty: the app-data folder": "空欄ならアプリデータフォルダー",
+  "Could not reach GitHub to check. See the <a href=\"{url}\" target=\"_blank\" rel=\"noopener\">releases page</a>.": "GitHub に接続できず確認できませんでした。<a href=\"{url}\" target=\"_blank\" rel=\"noopener\">リリースページ</a>をご覧ください。",
+  "Version v{version} is out: <a href=\"{url}\" target=\"_blank\" rel=\"noopener\">download it</a>, unzip it anywhere and run npm start there. Your saves and AI connection stay in {path}. In a copy of the repository: git pull, npm ci, npm start.": "v{version} が出ています：<a href=\"{url}\" target=\"_blank\" rel=\"noopener\">ダウンロード</a>して好きな場所に展開し、そこで npm start を実行します。セーブと AI 接続は {path} にそのまま残ります。リポジトリのコピーなら git pull、npm ci、npm start。",
+  "This is the latest version.": "最新バージョンです。",
+  "The provider does not know this model ID. Check its exact name in the model list of the provider.": "プロバイダーがこのモデル ID を認識していません。プロバイダーのモデル一覧で正確な名前を確認してください。"
 }

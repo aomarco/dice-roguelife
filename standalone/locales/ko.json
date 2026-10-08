@@ -33,7 +33,6 @@
   "Connection saved.": "연결을 저장했어요.",
   "Connected: {model}": "연결됨: {model}",
   "Standalone version v{version}": "독립 실행판 v{version}",
-  "Stop the server, then run git pull, npm ci and npm start. Your saves stay in standalone/data.": "서버를 멈추고 git pull, npm ci, npm start를 차례로 실행하세요. 저장은 standalone/data에 그대로 남아요.",
   "Choose an AI provider and model in Settings to start playing.": "설정에서 AI 제공업체와 모델을 고르면 플레이할 수 있어요.",
   "Start the app with npm start, then reload this page.": "npm start로 앱을 실행한 뒤 이 페이지를 새로고침하세요.",
   "Check the endpoint, model and limits in Settings.": "설정에서 엔드포인트, 모델, 한도를 확인하세요.",
@@ -52,7 +51,6 @@
   "The reply was not valid JSON.": "답이 올바른 JSON이 아니에요.",
   "Request failed.": "요청에 실패했어요.",
   "Server settings": "서버 설정",
-  "Kept in standalone/config.json on this computer.": "이 컴퓨터의 standalone/config.json에 저장돼요.",
   "Port": "포트",
   "Data folder (saves, images, AI connection)": "데이터 폴더 (저장, 이미지, AI 연결)",
   "Names for other devices, one per line (Tailscale)": "다른 기기에서 접속할 이름, 한 줄에 하나 (Tailscale)",
@@ -64,5 +62,11 @@
   "Advanced": "고급 설정",
   "That profile is gone. Choose another in Settings.": "그 프로필이 없어졌어요. 설정에서 다른 프로필을 고르세요.",
   "This is too large to store.": "너무 커서 저장할 수 없어요.",
-  "Now: port {port}, {path}": "현재: 포트 {port}, {path}"
+  "Now: port {port}, {path}": "현재: 포트 {port}, {path}",
+  "Kept in config.json in the app-data folder on this computer, with your saves.": "이 컴퓨터의 앱 데이터 폴더에 저장과 함께 config.json으로 보관돼요.",
+  "Empty: the app-data folder": "비우면 앱 데이터 폴더",
+  "Could not reach GitHub to check. See the <a href=\"{url}\" target=\"_blank\" rel=\"noopener\">releases page</a>.": "GitHub에 연결하지 못해 확인하지 못했어요. <a href=\"{url}\" target=\"_blank\" rel=\"noopener\">릴리스 페이지</a>를 확인하세요.",
+  "Version v{version} is out: <a href=\"{url}\" target=\"_blank\" rel=\"noopener\">download it</a>, unzip it anywhere and run npm start there. Your saves and AI connection stay in {path}. In a copy of the repository: git pull, npm ci, npm start.": "v{version}이 나왔어요: <a href=\"{url}\" target=\"_blank\" rel=\"noopener\">내려받아</a> 아무 곳에나 압축을 풀고 거기서 npm start를 실행하세요. 저장과 AI 연결은 {path}에 그대로 있어요. 저장소 사본이라면 git pull, npm ci, npm start.",
+  "This is the latest version.": "최신 버전이에요.",
+  "The provider does not know this model ID. Check its exact name in the model list of the provider.": "제공업체가 이 모델 ID를 알지 못해요. 제공업체의 모델 목록에서 정확한 이름을 확인하세요."
 }

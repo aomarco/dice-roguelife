@@ -1,6 +1,6 @@
 // The AI connection controls in ⚙ Settings, the standalone update steps, and the "choose a model" banner.
 import { platform } from '../../src/js/db.js';
-import { APP_VERSION } from '../../src/js/app.js';
+import { APP_VERSION, RELEASES_URL } from '../../src/js/app.js';
 import { openSheet } from '../../src/js/sheet.js';
 import { openSettingsSheet } from '../../src/js/settings-sheet.js';
 import { N_ } from '../../src/js/i18n.js';
@@ -76,12 +76,12 @@ function panelHtml() {
   </div></details>${serverHtml()}`;
 }
 
-// ⚙ Settings → Server settings: standalone/config.json, read and written through the server
+// ⚙ Settings → Server settings: config.json, read and written through the server
 function serverHtml() {
   return `<details class="diag-box"><summary>${tr('Server settings')}</summary><div class="diag-body provider-fields">
-    <p class="muted">${tr('Kept in standalone/config.json on this computer.')}</p>
+    <p class="muted">${tr('Kept in config.json in the app-data folder on this computer, with your saves.')}</p>
     <div class="field"><label for="srvPort">${tr('Port')}</label><input id="srvPort" type="number" min="1" max="65535"></div>
-    <div class="field"><label for="srvData">${tr('Data folder (saves, images, AI connection)')}</label><input id="srvData" autocomplete="off"></div>
+    <div class="field"><label for="srvData">${tr('Data folder (saves, images, AI connection)')}</label><input id="srvData" autocomplete="off" placeholder="${tr('Empty: the app-data folder')}"></div>
     <p class="muted" id="srvNow"></p>
     <div class="field"><label for="srvHosts">${tr('Names for other devices, one per line (Tailscale)')}</label><textarea id="srvHosts" rows="2" placeholder="my-pc.tail1234.ts.net"></textarea></div>
     <p class="muted" id="srvHint"></p>
@@ -206,10 +206,29 @@ export function bindProviderSettings(root) {
     });
 }
 
-function openUpdateSheet() {
+async function openUpdateSheet() {
   openSheet(
-    `<h3>${tr('Check for updates')}</h3><p>${tr('Standalone version v{version}', { version: esc(APP_VERSION) })}</p><p>${tr('Stop the server, then run git pull, npm ci and npm start. Your saves stay in standalone/data.')}</p><button class="btn" data-close>${tr('Close')}</button>`,
+    `<h3>${tr('Check for updates')}</h3><p>${tr('Standalone version v{version}', { version: esc(APP_VERSION) })}</p><p id="updNow" class="muted">${tr('Checking...')}</p><button class="btn" data-close>${tr('Close')}</button>`,
   );
+  const u = await post('/api/update', {}).catch(e => ({ error: e.message }));
+  const el = $('#updNow');
+  if (!el) return; // closed meanwhile
+  // the local server's own failure (stopped, restarted) says what to do; no answer from GitHub is not one
+  el.innerHTML = u.error
+    ? esc(u.error)
+    : !u.latest
+      ? tr(
+          'Could not reach GitHub to check. See the <a href="{url}" target="_blank" rel="noopener">releases page</a>.',
+          {
+            url: RELEASES_URL,
+          },
+        )
+      : u.newer
+        ? tr(
+            'Version v{version} is out: <a href="{url}" target="_blank" rel="noopener">download it</a>, unzip it anywhere and run npm start there. Your saves and AI connection stay in {path}. In a copy of the repository: git pull, npm ci, npm start.',
+            { version: esc(u.latest), url: esc(u.url), path: esc(u.dataPath) },
+          )
+        : tr('This is the latest version.');
 }
 
 // the "choose a model" banner, shown while the profile in use has no model

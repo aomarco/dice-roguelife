@@ -1,11 +1,16 @@
 // A standalone server on a free port with its own data folder, as the page sees it: its token and its picture cookie.
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { request } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { startServer } from '../server.js';
 
 export const tempDir = () => mkdtempSync(join(tmpdir(), 'dr-standalone-'));
+// what node tests need of the page is its token: a stub, not the game built for every server (null: build it)
+const STUB_DIR = tempDir();
+const STUB = join(STUB_DIR, 'page.html');
+writeFileSync(STUB, '<!doctype html><script></script>');
+process.on('exit', () => rmSync(STUB_DIR, { recursive: true, force: true }));
 
 // the status a request with this Host header gets (fetch can't set Host)
 export const hostStatus = (url, host) =>
@@ -18,8 +23,14 @@ export const hostStatus = (url, host) =>
     req.end();
   });
 
-export async function openServer({ dataDir = tempDir(), ...options } = {}) {
-  const server = await startServer({ port: 0, dataDir, configFile: join(dataDir, 'config.json'), ...options });
+export async function openServer({ dataDir = tempDir(), pageFile = STUB, ...options } = {}) {
+  const server = await startServer({
+    port: 0,
+    dataDir,
+    configFile: join(dataDir, 'config.json'),
+    pageFile,
+    ...options,
+  });
   const url = `http://127.0.0.1:${server.address().port}`;
   const res = await fetch(url);
   const token = /window.DR_SERVER_TOKEN="([a-f0-9]+)"/.exec(await res.text())[1];

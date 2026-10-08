@@ -81,6 +81,7 @@ const TEXT = {
   insufficient_credit: N_('The API account has insufficient credit or quota.'),
   provider_unavailable: N_('The provider is temporarily unavailable.'),
   invalid_request: N_('The provider rejected this request. Check the endpoint, model, JSON mode and output limit.'),
+  no_model: N_('The provider does not know this model ID. Check its exact name in the model list of the provider.'),
   output_limit: N_('The reply hit the output limit. Increase it in Settings.'),
   timeout: N_('The provider timed out.'),
   provider_error: N_('Could not reach the provider. Check your connection and endpoint.'),

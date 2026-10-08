@@ -146,6 +146,13 @@ test('incomplete streams and output limits do not commit successful replies', as
     );
   }
   assert.equal(httpError(429, 'insufficient_quota').code, 'insufficient_credit');
+  // Gemini: a bad key is a 400, an unknown model a 404
+  assert.equal(
+    httpError(400, '{"error":{"message":"API key not valid. Please pass a valid API key."}}').code,
+    'not_granted',
+  );
+  assert.equal(httpError(404, '{"error":{"message":"models/x is not found for API version v1beta"}}').code, 'no_model');
+  assert.equal(httpError(400, '{"error":{"message":"Invalid JSON payload"}}').code, 'invalid_request');
 });
 test('cancellation reaches upstream fetch', async () => {
   const c = new AbortController();

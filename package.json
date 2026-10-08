@@ -14,7 +14,7 @@
     "format": "prettier --write src tools tests standalone eslint.config.js playwright.config.js",
     "test": "playwright test",
     "release": "node tools/release.js",
-    "start": "node standalone/server.js",
+    "start": "node standalone/start.js",
     "test:standalone": "node --test \"standalone/tests/*.test.js\" && playwright test -c standalone/tests/playwright.config.js"
   },
   "devDependencies": {

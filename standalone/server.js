@@ -2,32 +2,96 @@
 // the AI connection on disk (store.js) and relays narration requests to the chosen provider (relay.js). See README.md.
 import { createServer } from 'node:http';
 import { randomBytes } from 'node:crypto';
-import { createReadStream, readFileSync, statfsSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { cpSync, createReadStream, existsSync, mkdirSync, readFileSync, statfsSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { build } from '../tools/build.js';
 import { apiError, relaySample } from './relay.js';
+import { buildPage } from './page.js';
 import { openStore, readJsonFile, writeAtomic } from './store.js';
 
 const HERE = fileURLToPath(new URL('.', import.meta.url));
-const CONFIG = join(HERE, 'config.json');
+// The download ships its page built and has no client/; a checkout always builds from its source, even with a
+// page.html left over from unzipping a download into it.
+const PAGE = existsSync(join(HERE, 'client')) ? null : join(HERE, 'page.html');
 const MAX_JSON = 32_000_000; // a save page or an image analysis request
 const MAX_ASSET = 25_000_000;
 const IDLE = 300_000; // a provider silent this long is given up on (a slow local model still streams)
 const HOST_NAME = /^[a-z0-9-]+(\.[a-z0-9-]+)*$/i;
 
-// standalone/config.json, written by hand or from ⚙ Settings → Server settings; every field is optional
+// Where config.json, saves, pictures and the AI connection live: the user's app-data folder, never the app's own, so an
+// update is a new copy with nothing to carry over and the app folder holds no keys. DICE_ROGUELIFE_HOME moves it.
+export function appHome() {
+  const env = process.env;
+  if (env.DICE_ROGUELIFE_HOME) return resolve(env.DICE_ROGUELIFE_HOME);
+  // Local, not Roaming: a picture library has no place in a profile synced at every logon
+  if (process.platform === 'win32')
+    return join(env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'dice-roguelife');
+  if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support', 'dice-roguelife');
+  return join(env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'dice-roguelife');
+}
+
+// Versions before 2.9 kept config.json and data/ in the app's folder. On the first start without data in the
+// app-data folder they are copied there, before any store opens it. Returns what was copied.
+export function adoptOldData(home = appHome(), from = HERE) {
+  const copied = [];
+  const oldData = join(from, 'data');
+  if (existsSync(join(oldData, 'dice-roguelife.db')) && !existsSync(join(home, 'dice-roguelife.db'))) {
+    cpSync(oldData, home, { recursive: true });
+    copied.push(oldData);
+  }
+  const oldConfig = join(from, 'config.json');
+  if (existsSync(oldConfig) && !existsSync(join(home, 'config.json'))) {
+    const c = readJsonFile(oldConfig, {});
+    // the old default was the app's own data/, now copied; any other folder stays where it is
+    if (c.dataDir === 'data' || !c.dataDir) delete c.dataDir;
+    else c.dataDir = resolve(from, c.dataDir);
+    mkdirSync(home, { recursive: true });
+    writeAtomic(join(home, 'config.json'), JSON.stringify(c, null, 2) + '\n');
+    copied.push(oldConfig);
+  }
+  return copied;
+}
+
+const REPO = 'https://github.com/wonjoonSeol-WS/dice-roguelife';
+const LATEST = 'https://api.github.com/repos/wonjoonSeol-WS/dice-roguelife/releases/latest';
+const VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+// the newest release next to this version: { latest, newer, url } with url its standalone zip; latest stays null when
+// GitHub can't be reached (offline, rate-limited), which is no error. Links are built here, never taken from the reply.
+export async function checkUpdate(fetcher = fetch) {
+  const out = { latest: null, newer: false, url: null };
+  try {
+    const r = await fetcher(LATEST, {
+      headers: { Accept: 'application/vnd.github+json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    const j = r.ok ? await r.json() : {};
+    const latest = String(j.tag_name || '').replace(/^v/, '');
+    if (!/^\d+\.\d+\.\d+$/.test(latest)) return out;
+    const zip = `dice-roguelife-standalone-v${latest.replaceAll('.', '_')}.zip`;
+    const shipped = (j.assets || []).some(a => a.name === zip);
+    out.latest = latest;
+    out.newer = latest.localeCompare(VERSION, 'en', { numeric: true }) > 0;
+    out.url = shipped ? `${REPO}/releases/download/v${latest}/${zip}` : `${REPO}/releases/tag/v${latest}`;
+  } catch {
+    // no answer this time
+  }
+  return out;
+}
+
+// config.json, written by hand or from ⚙ Settings → Server settings; every field is optional (dataDir '': the default)
 export function checkConfig(c) {
   const ok =
     c &&
     typeof c === 'object' &&
     (c.port === undefined || (Number.isInteger(c.port) && c.port >= 1 && c.port <= 65535)) &&
-    (c.dataDir === undefined || (typeof c.dataDir === 'string' && c.dataDir.trim() !== '')) &&
+    (c.dataDir === undefined || typeof c.dataDir === 'string') &&
     (c.hosts === undefined ||
       (Array.isArray(c.hosts) && c.hosts.length <= 10 && c.hosts.every(h => HOST_NAME.test(h))));
   if (!ok) throw apiError('bad_settings', 'config.json: port is 1 to 65535, dataDir a folder, hosts a list of names.');
   if (c.hosts) c.hosts = c.hosts.map(h => h.toLowerCase()); // browsers send host names in lower case
+  if (c.dataDir !== undefined) c.dataDir = c.dataDir.trim();
   return c;
 }
 // a profile by name, never something every object has (a profile named "constructor" or "toString")
@@ -54,17 +118,22 @@ const profilesView = c => ({
   profiles: Object.entries(c.profiles).map(([name, p]) => ({ name, config: p.config, hasKey: !!p.apiKey })),
 });
 
-// Options (port, dataDir, hosts) default to config.json; tests also pass configFile and fetcher.
-export async function startServer({ configFile = CONFIG, fetcher = fetch, ...options } = {}) {
+// Options (port, dataDir, hosts) default to config.json; tests also pass configFile, pageFile and fetcher.
+export async function startServer({
+  configFile = join(appHome(), 'config.json'),
+  pageFile = PAGE,
+  fetcher = fetch,
+  ...options
+} = {}) {
   const config = { ...checkConfig(readJsonFile(configFile, {})), ...options };
-  const dataDir = resolve(HERE, config.dataDir || 'data');
+  const folder = d => resolve(dirname(configFile), d || '.'); // a relative dataDir starts where config.json is
+  const dataDir = folder(config.dataDir);
   let names = config.hosts || []; // other names this server answers to, through a proxy here (e.g. `tailscale serve`)
   const token = randomBytes(32).toString('hex');
+  if (pageFile && !existsSync(pageFile))
+    throw new Error(`${pageFile} is missing. Download the standalone zip again from the latest release.`);
+  const html = pageFile ? readFileSync(pageFile, 'utf8') : (await buildPage()).html;
   const store = openStore(dataDir);
-  const { html } = await build(undefined, {
-    entry: join(HERE, 'client', 'main.js'),
-    css: readFileSync(join(HERE, 'client', 'standalone.css'), 'utf8'),
-  });
   const page = html.replace('<script>', `<script>window.DR_SERVER_TOKEN=${JSON.stringify(token)};`);
   const port = () => server.address().port;
   // this computer's own names, with the port, and without it on 80 (browsers leave a default port out)
@@ -125,22 +194,27 @@ export async function startServer({ configFile = CONFIG, fetcher = fetch, ...opt
         c.active = name;
       });
     },
+    // ⚙ Settings → Check for updates
+    '/api/update': async () => ({ ...(await checkUpdate(fetcher)), dataPath: dataDir }),
     // ⚙ Settings → Server settings: what config.json says, and what this run uses (port and folder change at the next
     // start, names at once)
     '/api/server/get': async () => {
       const saved = readJsonFile(configFile, {});
       return {
         port: saved.port ?? 3000,
-        dataDir: saved.dataDir || 'data',
+        dataDir: saved.dataDir || '',
         hosts: saved.hosts || [],
         running: { port: port(), dataPath: dataDir },
       };
     },
     '/api/server/set': async req => {
       const next = checkConfig(await readJson(req, 10_000));
-      writeAtomic(configFile, JSON.stringify({ ...readJsonFile(configFile, {}), ...next }, null, 2) + '\n');
+      const saved = { ...readJsonFile(configFile, {}), ...next };
+      if (!saved.dataDir) delete saved.dataDir;
+      mkdirSync(dirname(configFile), { recursive: true });
+      writeAtomic(configFile, JSON.stringify(saved, null, 2) + '\n');
       names = next.hosts || [];
-      return { restart: (next.port ?? 3000) !== port() || resolve(HERE, next.dataDir || 'data') !== dataDir };
+      return { restart: (saved.port ?? 3000) !== port() || folder(saved.dataDir) !== dataDir };
     },
   };
 
@@ -198,6 +272,7 @@ export async function startServer({ configFile = CONFIG, fetcher = fetch, ...opt
     server.once('error', reject);
     server.listen(config.port ?? 3000, '127.0.0.1', resolve);
   });
+  server.dataPath = dataDir;
   return server;
 }
 
@@ -239,7 +314,8 @@ async function relay(req, res, store, fetcher) {
   }
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const server = await startServer();
-  console.log(`Dice Roguelife (standalone): http://localhost:${server.address().port}`);
+// run directly, as before 2.9: the entry is start.js now
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  console.error('Start the game with npm start (node standalone/start.js).');
+  process.exitCode = 1;
 }

@@ -223,8 +223,9 @@ npm run release -- 2.5.0   # バージョンを上げて、検査、テスト、
 ## オプション：スタンドアロン版（開発者向け）
 
 遊ぶのはアーティファクトが基本です。API キーやローカルモデル（Ollama、LM Studio など）で自分のコンピューターで動かしたい方向けに、
-コミュニティが管理するアドオンが [standalone/](standalone/README.md) にあります：`npm ci` のあと `npm start`。アーティファクトとは別物で、
-アーティファクトのビルドには含まれません。スマホでも遊びたい場合は、Tailscale で自分のコンピューターに接続できます（その README を参照）。
+コミュニティが管理するアドオンが [standalone/](standalone/README.md) にあります：[最新リリース](https://github.com/wonjoonSeol-WS/dice-roguelife/releases/latest)から
+`dice-roguelife-standalone-v….zip` をダウンロードして展開し、`npm start`（Node.js 22.13 以降、インストール不要）。アーティファクトとは
+別ファイルで（アーティファクトのページは `dice-roguelife.html` のまま）、アーティファクトのビルドには含まれません。スマホでも遊びたい場合は、Tailscale で自分のコンピューターに接続できます（その README を参照）。
 
 ## ライセンス
 
