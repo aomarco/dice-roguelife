@@ -81,17 +81,53 @@ test('the server keeps saves and images across restarts, and images need the pag
   }
 });
 
-test('the key stays on the server: never sent back, kept for the same endpoint, dropped for another', async () => {
+test('connection profiles: keys stay on the server, kept per profile, renamed, switched and deleted', async () => {
   const s = await openServer();
-  const set = async body => (await s.call('/api/connection/set', JSON.stringify(body))).json();
-  const get = async () => (await s.call('/api/connection/get', '{}')).json();
-  const config = { endpoint: 'https://a.example/v1', model: 'm' };
+  const call = async (path, body) => {
+    const r = await s.call(path, JSON.stringify(body));
+    return r.ok ? r.json() : { status: r.status, ...(await r.json()) };
+  };
+  const stored = () => JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8'));
+  const paid = { endpoint: 'https://a.example/v1', model: 'm' };
+  const local = { endpoint: 'http://localhost:11434/v1', model: 'llama' };
   try {
-    assert.deepEqual(await set({ config, apiKey: 'secret-1' }), { hasKey: true });
-    assert.deepEqual(await get(), { config, hasKey: true });
-    await set({ config: { ...config, model: 'm2' } });
-    assert.equal(JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8')).apiKey, 'secret-1');
-    assert.deepEqual(await set({ config: { ...config, endpoint: 'https://b.example/v1' } }), { hasKey: false });
+    let v = await call('/api/connection/set', { name: 'Paid', config: paid, apiKey: 'secret-1' });
+    assert.deepEqual(v, { active: 'Paid', profiles: [{ name: 'Paid', config: paid, hasKey: true }] });
+    v = await call('/api/connection/set', { name: 'Local', config: local });
+    assert.deepEqual(
+      [v.active, v.profiles.map(p => [p.name, p.hasKey])],
+      [
+        'Local',
+        [
+          ['Paid', true],
+          ['Local', false],
+        ],
+      ],
+    );
+    assert.equal((await call('/api/connection/set', { name: 'Paid', config: local })).code, 'name_taken');
+    // a blank key keeps the profile's own; a rename keeps it too
+    await call('/api/connection/set', { name: 'Paid', previous: 'Paid', config: { ...paid, model: 'm2' } });
+    v = await call('/api/connection/set', { name: 'Work', previous: 'Paid', config: { ...paid, model: 'm2' } });
+    assert.deepEqual(
+      v.profiles.map(p => [p.name, p.hasKey]),
+      [
+        ['Local', false],
+        ['Work', true],
+      ],
+    );
+    assert.equal(stored().profiles.Work.apiKey, 'secret-1');
+    assert.equal(JSON.stringify(await call('/api/connection/get', {})).includes('secret-1'), false);
+    // another endpoint without a new key drops the old one
+    v = await call('/api/connection/set', {
+      name: 'Work',
+      previous: 'Work',
+      config: { ...paid, endpoint: 'https://b.example/v1' },
+    });
+    assert.equal(v.profiles.find(p => p.name === 'Work').hasKey, false);
+    assert.equal((await call('/api/connection/use', { name: 'Local' })).active, 'Local');
+    assert.equal((await call('/api/connection/use', { name: 'Nope' })).status, 400);
+    v = await call('/api/connection/delete', { name: 'Local' });
+    assert.deepEqual([v.active, v.profiles.map(p => p.name)], ['Work', ['Work']]);
   } finally {
     await s.stop();
   }

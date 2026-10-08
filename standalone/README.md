@@ -33,6 +33,9 @@ Use a model that follows JSON instructions well. Turn on JSON mode only if the m
 streaming if the endpoint doesn't support it. **Fast** in ⚙ Settings uses the optional summary model; Standard and
 Deep use the narration model.
 
+You can keep several connections as **profiles** (say, a paid model and a local one): pick **+ New profile** in the
+**Profile** list, name it and save. Choosing a profile in the list switches the game to it at once.
+
 Logins that reuse a chat subscription (Claude Pro/Max through Claude Code, ChatGPT through Codex, Gemini CLI) are not
 supported: their providers' terms don't allow it in other apps. If you have a Claude subscription, play the artifact.
 
@@ -42,9 +45,10 @@ API calls are billed to your API account. Like the artifact, the game makes extr
 Reviews, and a reply it can't read is retried up to twice. Network retries for rate limits and server errors are off
 by default (⚙ Settings). The usage line in Settings shows the tokens providers report.
 
-The connection and your key are kept on this computer in `standalone/data/connection.json`, **unencrypted**, so every
-browser here uses them. The server adds the key when it calls the provider: the page never gets it back, and it never
-goes into saves or exports. Choosing another endpoint without typing a new key drops the old one.
+Your connection profiles and their keys are kept on this computer in `standalone/data/connection.json`,
+**unencrypted**, so every browser here uses them. The server adds the key when it calls the provider: the page never
+gets it back, and it never goes into saves or exports. Saving a profile with another endpoint and no new key drops its
+old key.
 
 ## Saves and images
 

@@ -68,7 +68,8 @@ test('saves live on the server: they survive a reload and export/import without 
   await expect.poll(() => page.evaluate(() => DR.app.currentSave?.id)).toBe(saved.id);
   await expect.poll(() => page.evaluate(() => DR.app.turns.length)).toBe(saved.turns);
   // the key stayed on the server: kept across the reload, never handed to the page
-  expect(JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8')).apiKey).toBe('test-secret-never-export');
+  const stored = JSON.parse(readFileSync(join(s.dataDir, 'connection.json'), 'utf8'));
+  expect(stored.profiles['Profile 1'].apiKey).toBe('test-secret-never-export');
   expect(await page.content()).not.toContain('test-secret');
   await page.evaluate(() => DR.openSettingsSheet());
   await expect(page.locator('#apiKey')).toHaveAttribute('placeholder', /Saved on this computer/);
@@ -161,4 +162,32 @@ test('server settings are edited from ⚙ and kept in config.json', async ({ pag
   await expect(page.locator('#srvStatus')).toContainText('Saved');
   const file = JSON.parse(readFileSync(join(s.dataDir, 'config.json'), 'utf8'));
   expect(file.hosts).toEqual(['my-pc.tail1234.ts.net']);
+});
+
+test('several connection profiles: the one chosen narrates, and one can be deleted', async ({ page }) => {
+  await configure(page);
+  const ask = () => page.evaluate(() => DR.platform.sample('Say ok', { cache: false }));
+  await page.evaluate(() => DR.openSettingsSheet());
+  await page.selectOption('#apiProfile', '');
+  await expect(page.locator('#apiName')).toHaveValue('Profile 2');
+  await page.fill('#apiName', 'Local');
+  await page.selectOption('#apiProvider', 'ollama');
+  await page.fill('#apiModel', 'local-model');
+  await page.click('#apiSave');
+  await expect(page.locator('#apiStatus')).toHaveText('Connection saved.');
+  await expect(page.locator('#apiProfile')).toHaveValue('Local');
+  await ask();
+  expect(models.at(-1)).toBe('local-model');
+  await page.selectOption('#apiProfile', 'Profile 1');
+  await expect(page.locator('#apiStatus')).toHaveText('Using Profile 1.');
+  await expect(page.locator('#apiModel')).toHaveValue('mock-model');
+  await ask();
+  expect(models.at(-1)).toBe('mock-model');
+  await page.selectOption('#apiProfile', 'Local');
+  await page.click('#apiDelete');
+  await expect(page.locator('#apiDelete')).toHaveText('Delete Local? Press again.');
+  await page.click('#apiDelete');
+  await expect(page.locator('#apiProfile option')).toHaveText(['Profile 1', '+ New profile']);
+  await ask();
+  expect(models.at(-1)).toBe('mock-model');
 });

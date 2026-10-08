@@ -38,6 +38,11 @@ async function readBody(req, max, code = 'too_large') {
   }
   return Buffer.concat(chunks);
 }
+// what the page may see of the AI connection profiles: everything but the keys
+const profilesView = c => ({
+  active: c.active,
+  profiles: Object.entries(c.profiles).map(([name, p]) => ({ name, config: p.config, hasKey: !!p.apiKey })),
+});
 const readJson = async (req, max = MAX_JSON, code) => JSON.parse(await readBody(req, max, code));
 const sendJson = (res, status, value) => {
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -84,10 +89,22 @@ export async function startServer(options = {}) {
       store.assets.delete((await readJson(req, 1000)).id);
       return {};
     },
-    // the page sees the connection without its key; a new endpoint without a new key drops the old one
-    '/api/connection/get': async () => {
-      const { config, apiKey } = store.connection.get();
-      return { config, hasKey: !!apiKey };
+    // AI connection profiles: the page sees each one without its key, and picks the one that narrates
+    '/api/connection/get': async () => profilesView(store.connection.get()),
+    '/api/connection/use': async req => {
+      const { name } = await readJson(req, 1000);
+      const c = store.connection.get();
+      if (!c.profiles[name]) throw apiError('invalid_config', 'No such profile.');
+      store.connection.set({ ...c, active: name });
+      return profilesView({ ...c, active: name });
+    },
+    '/api/connection/delete': async req => {
+      const { name } = await readJson(req, 1000);
+      const c = store.connection.get();
+      delete c.profiles[name];
+      if (c.active === name) c.active = Object.keys(c.profiles)[0] || '';
+      store.connection.set(c);
+      return profilesView(c);
     },
     // ⚙ Settings → Server: the port and data folder apply at the next start, the names at once
     '/api/server/get': async () => ({
@@ -108,16 +125,21 @@ export async function startServer(options = {}) {
       allow(next.hosts);
       return { restart: next.port !== port || resolve(HERE, saved.dataDir) !== resolve(dataDir) };
     },
+    // saves a profile (previous: the one it was, for a rename; none for a new one) and makes it the one in use.
+    // A blank key keeps the profile's own, unless the endpoint changed.
     '/api/connection/set': async req => {
-      const next = await readJson(req, 100_000);
-      const old = store.connection.get();
-      const apiKey = next.apiKey
-        ? String(next.apiKey).trim()
-        : next.config.endpoint === old.config.endpoint
-          ? old.apiKey
-          : '';
-      store.connection.set({ config: next.config, apiKey });
-      return { hasKey: !!apiKey };
+      const { name: raw, previous, config, apiKey } = await readJson(req, 100_000);
+      const name = String(raw || '').trim();
+      if (!name || name.length > 40) throw apiError('invalid_config', 'Profile name');
+      const c = store.connection.get();
+      if (name !== previous && c.profiles[name]) throw apiError('name_taken', 'That profile name is taken.');
+      const old = c.profiles[previous] || { config: {}, apiKey: '' };
+      const key = apiKey ? String(apiKey).trim() : config.endpoint === old.config.endpoint ? old.apiKey : '';
+      if (previous && previous !== name) delete c.profiles[previous];
+      c.profiles[name] = { config, apiKey: key };
+      c.active = name;
+      store.connection.set(c);
+      return profilesView(c);
     },
   };
 
@@ -192,7 +214,8 @@ async function relay(req, res, store, fetcher) {
   });
   try {
     const { prompt, image, json, quick } = await readJson(req, MAX_JSON, 'prompt_too_large');
-    const { config, apiKey } = store.connection.get();
+    const c = store.connection.get();
+    const { config, apiKey } = c.profiles[c.active] || { config: {} };
     if (!config.model) throw apiError('not_configured', 'No model chosen.');
     const model = quick && config.summaryModel ? config.summaryModel : config.model;
     const emit = event => {

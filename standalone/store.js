@@ -118,13 +118,14 @@ export function openStore(dir) {
     },
   };
 
-  // the AI connection: { config, apiKey }, kept apart from the game's documents so saves and exports never hold it
+  // the AI connection profiles: { active, profiles: { name: { config, apiKey } } }, kept apart from the game's documents
+  // so saves and exports never hold a key
   const connection = {
     get() {
       try {
         return JSON.parse(readFileSync(connectionFile, 'utf8'));
       } catch {
-        return { config: {}, apiKey: '' };
+        return { active: '', profiles: {} };
       }
     },
     set: value => writeAtomic(connectionFile, JSON.stringify(value, null, 2)),

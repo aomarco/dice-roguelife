@@ -7,7 +7,18 @@ import { N_ } from '../../src/js/i18n.js';
 import { $, esc } from '../../src/js/util.js';
 import { tr } from './i18n.js';
 import { post } from './net.js';
-import { PROVIDERS, providerConfig, providerHasKey, providerUsage, saveConnection } from './providers.js';
+import {
+  PROVIDERS,
+  activeProfile,
+  deleteProfile,
+  profileConfig,
+  profileHasKey,
+  profileNames,
+  providerConfig,
+  providerUsage,
+  saveConnection,
+  useProfile,
+} from './providers.js';
 
 const PROTOCOLS = [
   ['compatible', N_('OpenAI-compatible')],
@@ -28,6 +39,7 @@ const TEXT = {
 };
 const NUMBERS = { Max: 'maxTokens', Budget: 'promptBytes', Retries: 'retries' };
 const CHECKS = { Stream: 'stream', Json: 'jsonMode', Vision: 'vision' };
+const NEW = ''; // the "+ New profile" entry
 
 function panelHtml() {
   const opts = list => list.map(([v, label]) => `<option value="${v}">${esc(tr(label))}</option>`).join('');
@@ -35,6 +47,8 @@ function panelHtml() {
   const field = (id, label, attrs = '') =>
     `<div class="field"><label for="${id}">${label}</label><input id="${id}" ${attrs}></div>`;
   return `<details class="diag-box" open><summary>${tr('AI connection')}</summary><div class="diag-body provider-fields">
+    <div class="field"><label for="apiProfile">${tr('Profile')}</label><select id="apiProfile"></select></div>
+    ${field('apiName', tr('Profile name'), 'maxlength="40" autocomplete="off"')}
     <div class="field"><label for="apiProvider">${tr('Provider')}</label><select id="apiProvider">${opts(PROVIDERS.map(p => [p.id, p.name]))}</select></div>
     ${field('apiEndpoint', tr('API base URL'), 'type="url"')}
     <div class="field"><label for="apiProtocol">${tr('API protocol')}</label><select id="apiProtocol">${opts(PROTOCOLS)}</select></div>
@@ -48,7 +62,7 @@ function panelHtml() {
     ${check('apiJson', tr('Request JSON mode (only if supported by the model)'))}
     ${check('apiVision', tr('Enable image analysis (vision model required)'))}
     <p class="muted">${tr('API calls may cost money. Retries can make extra calls. Fast uses the summary model; Standard and Deep use the narration model. The connection and key are kept on this computer, never in game saves or exports.')}</p>
-    <div class="row"><button class="btn" id="apiSave">${tr('Save connection')}</button><button class="btn ghost" id="apiTest">${tr('Test connection (one API call)')}</button></div>
+    <div class="row"><button class="btn" id="apiSave">${tr('Save connection')}</button><button class="btn ghost" id="apiTest">${tr('Test connection (one API call)')}</button><button class="btn ghost" id="apiDelete">${tr('Delete profile')}</button></div>
     <p id="apiStatus" role="status" class="muted"></p>
     <p class="muted">${tr('Session usage: {calls} calls, {input} input tokens, {output} output tokens (when reported)', providerUsage)}</p>
   </div></details>${serverHtml()}`;
@@ -101,15 +115,62 @@ async function bindServerSettings(root) {
 export function bindProviderSettings(root) {
   root.querySelector('.ui-lang-field').insertAdjacentHTML('afterend', panelHtml());
   root.querySelector('#updBtn').onclick = openUpdateSheet;
-  if (!providerConfig().model) showSetupBanner(); // again in the screen language, which may have just changed
+  syncBanner(); // again in the screen language, which may have just changed
   bindServerSettings(root).catch(e => (root.querySelector('#srvStatus').textContent = e.message));
   const q = id => root.querySelector('#api' + id);
-  const c = providerConfig();
-  for (const [id, key] of Object.entries({ ...TEXT, ...NUMBERS })) q(id).value = c[key] ?? '';
-  for (const [id, key] of Object.entries(CHECKS)) q(id).checked = !!c[key];
-  const keyHint = () =>
-    (q('Key').placeholder = providerHasKey() ? tr('Saved on this computer. Leave blank to keep it.') : '');
-  keyHint();
+  const status = text => (q('Status').textContent = text);
+  let armed = false; // Delete was pressed once
+  // the profile list, then the chosen profile's settings (a new one starts from the defaults)
+  const show = name => {
+    const names = profileNames();
+    q('Profile').innerHTML = [...names.map(n => [n, n]), [NEW, tr('+ New profile')]]
+      .map(([v, label]) => `<option value="${esc(v)}">${esc(label)}</option>`)
+      .join('');
+    q('Profile').value = name;
+    q('Name').value = name || tr('Profile {n}', { n: names.length + 1 });
+    const c = profileConfig(name);
+    for (const [id, key] of Object.entries({ ...TEXT, ...NUMBERS })) q(id).value = c[key] ?? '';
+    for (const [id, key] of Object.entries(CHECKS)) q(id).checked = !!c[key];
+    q('Key').value = '';
+    q('Key').placeholder = profileHasKey(name) ? tr('Saved on this computer. Leave blank to keep it.') : '';
+    q('Delete').disabled = !name;
+    q('Delete').textContent = tr('Delete profile');
+    armed = false;
+  };
+  const afterChange = async () => {
+    platform.limits = await platform.sample.limits();
+    syncBanner();
+  };
+  show(activeProfile());
+  // choosing a profile makes it the one that narrates
+  q('Profile').onchange = async () => {
+    const name = q('Profile').value;
+    if (name === NEW) return show(NEW);
+    try {
+      await useProfile(name);
+      show(name);
+      await afterChange();
+      status(tr('Using {name}.', { name }));
+    } catch (e) {
+      status(e.message);
+    }
+  };
+  q('Delete').onclick = async () => {
+    const name = q('Profile').value;
+    if (!armed) {
+      armed = true;
+      q('Delete').textContent = tr('Delete {name}? Press again.', { name });
+      return;
+    }
+    try {
+      await deleteProfile(name);
+      show(activeProfile());
+      await afterChange();
+      status('');
+    } catch (e) {
+      status(e.message);
+    }
+  };
   q('Provider').onchange = () => {
     const p = PROVIDERS.find(p => p.id === q('Provider').value);
     q('Endpoint').value = p.endpoint;
@@ -124,12 +185,14 @@ export function bindProviderSettings(root) {
     const counts = Object.values(NUMBERS).every(k => Number.isInteger(next[k]) && next[k] >= 0);
     if (!next.model || !next.endpoint || !counts || !next.maxTokens || !next.promptBytes)
       throw new Error(tr('Enter an endpoint, model and valid limits.'));
-    await saveConnection(next, q('Key').value);
-    q('Key').value = '';
-    keyHint();
-    platform.limits = await platform.sample.limits();
-    $('#noSample').classList.add('hidden');
-    q('Status').textContent = tr('Connection saved.');
+    const name = q('Name').value.trim();
+    if (!name) throw new Error(tr('Enter a profile name (up to 40 characters).'));
+    await saveConnection(name, q('Profile').value || undefined, next, q('Key').value).catch(e => {
+      throw e.code === 'name_taken' ? new Error(tr('A profile with that name already exists.')) : e;
+    });
+    show(name);
+    await afterChange();
+    status(tr('Connection saved.'));
   };
   q('Save').onclick = () => save().catch(e => (q('Status').textContent = e.message));
   q('Test').onclick = async () => {
@@ -158,4 +221,9 @@ export function showSetupBanner() {
   n.innerHTML = `${tr('Choose an AI provider and model in Settings to start playing.')} <button class="btn inline-action" id="configureAI">${tr('Settings')}</button>`;
   n.classList.remove('hidden');
   $('#configureAI').onclick = openSettingsSheet;
+}
+// the banner shows while the profile in use has no model
+function syncBanner() {
+  if (providerConfig().model) $('#noSample').classList.add('hidden');
+  else showSetupBanner();
 }

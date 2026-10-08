@@ -41,25 +41,30 @@ const DEFAULTS = {
   jsonMode: false,
   stream: true,
 };
-// the connection lives on the server (its key never comes back to the page); this is the page's copy
-let config = { ...DEFAULTS };
-let hasKey = false;
-let blocked = null; // a key or account failure: later calls fail at once until the connection is saved again
-export const providerConfig = () => ({ ...config });
-export const providerHasKey = () => hasKey;
-export async function loadConnection() {
-  const r = await (await post('/api/connection/get', {})).json();
-  config = { ...DEFAULTS, ...r.config };
-  hasKey = r.hasKey;
-}
-// a blank key keeps the saved one for the same endpoint
-export async function saveConnection(next, apiKey) {
-  const r = await (await post('/api/connection/set', { config: next, apiKey })).json();
-  config = { ...DEFAULTS, ...next };
-  hasKey = r.hasKey;
+// The connection profiles live on the server (their keys never come back to the page); this is the page's copy.
+let profiles = []; // each: name, config and whether it has a key
+let active = '';
+let blocked = null; // a key or account failure: later calls fail at once until the connection changes
+const profileOf = name => profiles.find(p => p.name === name);
+export const profileNames = () => profiles.map(p => p.name);
+export const activeProfile = () => active;
+// a profile's settings, or the defaults for a new one
+export const profileConfig = (name = active) => ({ ...DEFAULTS, ...(profileOf(name) || {}).config });
+export const providerConfig = () => profileConfig(active);
+export const profileHasKey = name => !!(profileOf(name) || {}).hasKey;
+async function take(path, body) {
+  const view = await (await post(path, body)).json();
+  profiles = view.profiles;
+  active = view.active;
   blocked = null;
   replay.clear();
 }
+export const loadConnection = () => take('/api/connection/get', {});
+export const useProfile = name => take('/api/connection/use', { name });
+export const deleteProfile = name => take('/api/connection/delete', { name });
+// saves profile `name` (previous: the one it was, for a rename; none for a new one) and uses it; a blank key keeps its own
+export const saveConnection = (name, previous, config, apiKey) =>
+  take('/api/connection/set', { name, previous, config, apiKey });
 export const providerUsage = { calls: 0, input: 0, output: 0 };
 const replay = new Map(); // finished replies the game may ask for again (its cache option), for up to an hour
 
@@ -109,7 +114,7 @@ function parseJson(text) {
 }
 
 async function imagePart(blob) {
-  if (!config.vision) throw failure('no_vision');
+  if (!providerConfig().vision) throw failure('no_vision');
   if (!(blob instanceof Blob) || blob.size > 8000000 || !/^image\/(png|jpeg|webp|gif)$/.test(blob.type))
     throw failure('bad_image');
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -141,12 +146,12 @@ async function relay(body, signal, onText) {
 
 export async function sample(prompt, opts = {}) {
   if (blocked) throw blocked;
-  if (!config.model) throw failure('not_configured');
+  if (!providerConfig().model) throw failure('not_configured');
   if (opts.signal && opts.signal.aborted) throw failure('cancelled');
   const quick = opts.modelTier === 'quick'; // Fast: the server uses the summary model when there is one
   const cacheKey =
     opts.cache && !opts.images
-      ? await sha256Hex(new Blob([JSON.stringify([config, quick, prompt, !!opts.json])]))
+      ? await sha256Hex(new Blob([JSON.stringify([providerConfig(), quick, prompt, !!opts.json])]))
       : null;
   const cached = cacheKey && replay.get(cacheKey);
   if (cached && !opts.cache.refresh && cached.until > Date.now()) {
@@ -188,4 +193,7 @@ export async function sample(prompt, opts = {}) {
   }
 }
 sample.json = async (prompt, opts = {}) => parseJson((await sample(prompt, { ...opts, json: true })).text);
-sample.limits = async () => ({ maxPromptBytes: config.promptBytes, images: !!config.vision });
+sample.limits = async () => {
+  const c = providerConfig();
+  return { maxPromptBytes: c.promptBytes, images: !!c.vision };
+};
