@@ -19,6 +19,7 @@ import { redrawNoSample } from './boot.js';
 import { applyEnterHint, enterPref, setEnterPref, syncEnterTog } from './composer.js';
 import { openUpdateSheet } from './update.js';
 import { ADMIN_PERSONAS, promptStats, recentBudget, recentLine } from './prompt.js';
+import { providerSettingsHtml, bindProviderSettings } from './provider-settings.js';
 
 let lastTierCheck = null; // what the platform actually served for the tier we asked (a plan may substitute a cheaper one)
 
@@ -39,6 +40,7 @@ function settingsHtml() {
   const langLabel = uiLang() === SOURCE_LANG ? 'Language' : `${T('Language')} · Language`;
   return `<div class="row verrow"><span class="muted">${T('Version v{version}', { version: esc(APP_VERSION) })}</span><button class="btn ghost" id="updBtn" type="button">${T('Check for updates')}</button></div>
     <div class="field ui-lang-field"><label for="uiLangSel">${langLabel}</label><select id="uiLangSel">${langOptions()}</select></div>
+    ${host().id === 'browser' ? providerSettingsHtml() : ''}
     <div class="row"><div class="field grow"><label for="tierSel">${T('Narration model')}</label><select id="tierSel">${options(
       [
         ['quick', N_('Fast (quick)')],
@@ -51,7 +53,7 @@ function settingsHtml() {
       ['normal', N_('Up to the model')],
       ['long', N_('Long')],
     ])}</select></div></div>
-    <p class="muted tier-probe"><span id="tierProbe">${lastTierCheck ? tierProbeHtml(lastTierCheck) : T('Your plan may substitute a lower tier for the narration model.')}</span><button class="btn ghost chip-sm" id="tierCheck">${T('Check now')}</button></p>
+    <p class="muted tier-probe" ${host().id === 'browser' ? 'hidden' : ''}><span id="tierProbe">${lastTierCheck ? tierProbeHtml(lastTierCheck) : T('Your plan may substitute a lower tier for the narration model.')}</span><button class="btn ghost chip-sm" id="tierCheck">${T('Check now')}</button></p>
     <div class="field recent-field"><label for="recentSel">${T('Recent memory (how much goes in word for word; older turns are summarized)')}</label><select id="recentSel">${options(
       [
         ['20000', N_('Small (20KB)')],
@@ -170,7 +172,9 @@ async function runDiag(el) {
         ? T('Preview (not saved)')
         : platform.localMode
           ? T('This device only')
-          : T('Saved on the server'),
+          : host().id === 'browser'
+            ? T('This device only')
+            : T('Saved on the server'),
     }),
   );
   try {
@@ -288,6 +292,7 @@ const PLAIN_SETTINGS = [
 
 function bindSettings(root) {
   const q = id => root.querySelector('#' + id);
+  if (host().id === 'browser') bindProviderSettings(root);
   for (const c of PLAIN_SETTINGS) bindPlainSetting(q, c);
   bindUiLang(q);
   bindStoryLang(q);

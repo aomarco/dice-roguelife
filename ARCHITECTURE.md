@@ -1,3 +1,5 @@
+> **Standalone fork:** See [STANDALONE.md](STANDALONE.md) and [README.md](README.md) for the local server, API providers, IndexedDB storage and validation. The original artifact-specific architecture/release workflow below remains for Claude artifact mode.
+
 # 구조
 
 이 문서는 코드를 처음 보는 사람(또는 새 세션)이 어디서 무엇이 일어나는지 찾을 수 있게 하는 지도입니다. 함수 이름은

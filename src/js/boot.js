@@ -5,7 +5,8 @@ import { dget, loadWhitelist, memDB, platform, thaw, userCol } from './db.js';
 import { app } from './app.js';
 import { settingsLoaded } from './settings.js';
 import { okLang, T, uiLang } from './i18n.js';
-import { applyUiLang } from './settings-sheet.js';
+import { applyUiLang, openSettingsSheet } from './settings-sheet.js';
+import { providerConfig } from './providers.js';
 import { applyDiscreet } from './shell.js';
 import { loadImages, loadSets, migrateLegacy } from './library.js';
 import { startNewLifeForm } from './new-life.js';
@@ -59,6 +60,13 @@ function showNoSample(kind) {
   $('#retrySample').onclick = ensureSample;
 }
 export function redrawNoSample() {
+  if (host().id === 'browser') {
+    const n = $('#noSample');
+    n.classList.toggle('hidden', !!providerConfig().model);
+    n.innerHTML = `${T('Choose an AI provider and model in Settings to start playing.')} <button class="btn inline-action" id="configureAI">${T('Settings')}</button>`;
+    $('#configureAI').onclick = openSettingsSheet;
+    return;
+  }
   if (noSampleKind) showNoSample(noSampleKind);
 }
 export async function ensureSample() {
@@ -147,6 +155,7 @@ async function bootInner() {
   const last = (app.settings.lastSave && app.saves.find(s => s.id === app.settings.lastSave)) || app.saves[0];
   if (last) await openSave(last.id);
   else startNewLifeForm();
+  redrawNoSample();
 }
 
 // players from before the setting existed keep Korean; new players keep the detected language

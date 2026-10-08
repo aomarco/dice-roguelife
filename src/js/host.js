@@ -22,8 +22,9 @@
  *   'downloads'  save({ filename, data: Blob }) -> { status }
  */
 import { claudeHost } from './host-claude.js';
+import { browserHost } from './host-browser.js';
 
-const HOSTS = [claudeHost];
+const HOSTS = [claudeHost, browserHost];
 const NO_HOST = { id: 'none', available: () => true, connect: async () => null, assetUrl: id => id }; // a plain browser: no capabilities, the game runs in memory
 
 let chosen = null;

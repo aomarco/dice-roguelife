@@ -13,7 +13,9 @@
     "lint": "node tools/release.js --check",
     "format": "prettier --write src tools tests eslint.config.js playwright.config.js",
     "test": "playwright test",
-    "release": "node tools/release.js"
+    "release": "node tools/release.js",
+    "start": "node tools/server.js",
+    "test:api": "node --test tests/provider-api.test.js"
   },
   "devDependencies": {
     "@playwright/test": "1.56.0",

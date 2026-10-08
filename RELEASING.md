@@ -1,3 +1,5 @@
+> **Standalone fork:** See [STANDALONE.md](STANDALONE.md) and [README.md](README.md) for the local server, API providers, IndexedDB storage and validation. The original artifact-specific architecture/release workflow below remains for Claude artifact mode.
+
 # 배포 절차
 
 게임은 claude.ai 아티팩트 하나로 운영됩니다. 저장 데이터가 그 아티팩트의 데이터베이스에 묶여 있으므로, 배포는 항상

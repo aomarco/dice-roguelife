@@ -4278,3 +4278,26 @@ textarea.mem-edit {
 .sw-actions {
   margin-top: 14px;
 }
+
+.provider-fields {
+  white-space: normal;
+}
+.provider-fields .field {
+  margin-top: 10px;
+}
+.provider-fields input:not([type='checkbox']),
+.provider-fields select {
+  width: 100%;
+  min-width: 0;
+}
+
+.provider-fields,
+.provider-fields * {
+  box-sizing: border-box;
+}
+.provider-fields .grow {
+  min-width: 0;
+}
+.provider-fields .row {
+  flex-wrap: wrap;
+}

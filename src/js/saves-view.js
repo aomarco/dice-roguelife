@@ -284,9 +284,12 @@ export async function exportStory(id, fmt, range, mine, stat) {
       app.settings.discreet = prevD;
     }
     // every picture the turns actually show (scene, everyone on screen, ADMIN's face) goes into the file
-    const at = host()
-      .assetUrl('')
-      .replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'); // the file store's URL prefix, as a pattern
+    if (host().assetEntries) {
+      for (const [id, url] of host().assetEntries()) {
+        if (body.includes(url)) body = body.split(url).join('dr-asset:' + id);
+      }
+    }
+    const at = (host().assetEntries ? 'dr-asset:' : host().assetUrl('')).replace(/[.*+?^${}()|[\]\\/]/g, '\\$&'); // the file store's URL prefix, as a pattern
     const ids = new Set([...body.matchAll(new RegExp(at + `([^'")]+)`, 'g'))].map(m => m[1]));
     const urls = {};
     let n = 0;
@@ -378,6 +381,18 @@ export function renderSaves() {
     .then(({ used, cap }) => {
       const g = $('#dbGauge');
       if (!g) return;
+      if (host().id === 'browser') {
+        navigator.storage
+          .estimate()
+          .then(({ usage = 0, quota = 0 }) => {
+            g.textContent = T('Device storage: {used} MB / {quota} MB', {
+              used: (usage / 1048576).toFixed(1),
+              quota: (quota / 1048576).toFixed(0),
+            });
+          })
+          .catch(e => noteIgnored('device storage estimate', e));
+        return;
+      }
       const r = used / cap,
         col = r >= 0.95 ? 'var(--danger)' : r >= 0.8 ? 'var(--gold)' : 'var(--sys)';
       g.innerHTML = `<div class="row gauge-head"><span>${T('Storage (documents)')}</span><span><b style="color:${col}">${T('about {n}', { n: used.toLocaleString(locale()) })}</b> / ${cap.toLocaleString(locale())}</span></div><div class="gauge-bar"><i style="display:block;height:100%;width:${Math.min(100, r * 100).toFixed(1)}%;background:${col}"></i></div>${r >= 0.8 ? `<p class="gauge-msg" style="color:${col}">${r >= 0.95 ? T('Almost no space left. Export old saves or branches, then delete them to free some.') : T('Not much space left. Export old saves or branches, then delete them to free some.')}</p>` : ''}`;
